@@ -11,6 +11,10 @@ impl<'a> Cpu<'a> {
             bus: bus,
         }
     }
+
+    pub fn tick() {
+        
+    }
 }
 
 

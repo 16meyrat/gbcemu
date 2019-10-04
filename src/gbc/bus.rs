@@ -6,7 +6,7 @@ use super::cartridge::Cartridge;
 pub struct Bus<'a>{
     ppu: Ppu,
     ram: Ram,
-    cartridge: &'a mut Cartridge,
+    cartridge: &'a mut dyn Cartridge,
 }
 
 pub trait Busable {
@@ -25,7 +25,7 @@ impl<'a> Busable for Bus<'a> {
 }
 
 impl<'a> Bus<'a> {
-    pub fn new(cartridge: &'a mut Cartridge) -> Bus<'a> {
+    pub fn new(cartridge: &'a mut dyn Cartridge) -> Bus<'a> {
         Bus {
             ppu: Ppu::new(),
             ram: Ram::new(),

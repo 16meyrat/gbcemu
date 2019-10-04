@@ -2,15 +2,16 @@ mod gbc;
 
 use gbc::bus::Bus;
 use gbc::cpu::Cpu;
-use gbc::cartridge::Cartridge;
+use gbc::cartridge::load_rom;
+
+extern crate num_enum;
 
 fn main() {
-    println!("Hello, world!");
     runEmulator();
 }
 
 fn runEmulator() {
-    let mut cartridge = Cartridge::new("Tetris.GB");
-    let mut bus = Bus::new(& mut cartridge);
+    let mut rom = load_rom("Tetris.GB");
+    let mut bus = Bus::new(&mut *rom);
     let mut cpu = Cpu::new(& mut bus);
 }
