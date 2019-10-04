@@ -16,11 +16,25 @@ pub trait Busable {
 
 impl<'a> Busable for Bus<'a> {
     fn read(&self, addr: u16) -> u8{
-        0
+        match addr {
+            x if x < 0x800 => self.cartridge.read(addr),
+            x if x < 0xa00 => self.ppu.read(addr),
+            x if x < 0xc00 => self.cartridge.read(addr),
+            x if x < 0xe00 => self.ram.read(addr),
+            x if x < 0xFE00 => self.ram.read(addr - 0x2000),
+            _ => 0
+        }
     }
 
     fn write(&mut self, addr: u16, value: u8){
-
+        match addr {
+            x if x < 0x800 => self.cartridge.write(addr, value),
+            x if x < 0xa00 => self.ppu.write(addr, value),
+            x if x < 0xc00 => self.cartridge.write(addr, value),
+            x if x < 0xe00 => self.ram.write(addr, value),
+            x if x < 0xFE00 => self.ram.write(addr - 0x2000, value),
+            _ => {}
+        };
     }
 }
 

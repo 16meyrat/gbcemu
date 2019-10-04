@@ -7,10 +7,10 @@ use gbc::cartridge::load_rom;
 extern crate num_enum;
 
 fn main() {
-    runEmulator();
+    run_emulator();
 }
 
-fn runEmulator() {
+fn run_emulator() {
     let mut rom = load_rom("Tetris.GB");
     let mut bus = Bus::new(&mut *rom);
     let mut cpu = Cpu::new(& mut bus);
