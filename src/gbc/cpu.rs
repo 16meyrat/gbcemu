@@ -1,26 +1,16 @@
 
-use super::bus::Busable;
 use super::bus::Bus;
 
-pub struct Cpu {
-
+pub struct Cpu<'a> {
+    bus: &'a mut Bus<'a>,
 }
 
-impl Cpu {
-    pub fn new(bus: ) {
-        return {
-            
-        };
+impl<'a> Cpu<'a> {
+    pub fn new(bus: &'a mut Bus<'a>) -> Self {
+        Cpu{
+            bus: bus,
+        }
     }
 }
 
-impl Busable for Cpu {
-    fn read(&self, addr: u16) -> u8{
-        0
-    }
-
-    fn write(&mut self, addr: u16, value: u8){
-        
-    }
-}
 

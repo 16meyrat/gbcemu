@@ -1,11 +1,12 @@
 mod gbc;
 
 use gbc::bus::Bus;
-use gbc::bus::Cpu;
+use gbc::cpu::Cpu;
 use gbc::cartridge::Cartridge;
 
 fn main() {
     println!("Hello, world!");
+    runEmulator();
 }
 
 fn runEmulator() {
