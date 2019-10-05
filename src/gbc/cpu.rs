@@ -93,6 +93,29 @@ impl<'a> Cpu<'a> {
                 }
             )
         }
+
+        macro_rules! inc {
+            ($arg:ident) => ({
+                let before = self.$arg;
+                self.$arg = u8::wrapping_add(self.$arg, 1);
+                self.zerof = if self.$arg == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((before & 0xf) + 1) & 0x10 != 0 {1} else {0};
+                disasm!("Inc {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! dec {
+            ($arg:ident) => ({
+                let before = self.$arg;
+                self.$arg = u8::wrapping_sub(self.$arg, 1);
+                self.zerof = if self.$arg == 0 {1} else {0};
+                self.add_subf = 1;
+                self.half_carryf = if (before & 0xf) == 0 {0} else {1};
+                disasm!("Dec {}", stringify!($arg));
+            });
+        }
+
         let op = self.bus.cartridge.read(self.pc);
         match op {
             0x0 => {
@@ -447,18 +470,18 @@ impl<'a> Cpu<'a> {
                 disasm!("LD (DE), A");
             }
             0x22 => {
-                let mut hl = (self.h as u16) << 8 | self.h as u16;
+                let mut hl = (self.h as u16) << 8 | self.l as u16;
                 self.bus.write(hl, self.a);
-                hl += 1;
+                hl = u16::wrapping_add(hl, 1);
                 self.h = (hl >> 8) as u8;
                 self.l = (hl & 0xff) as u8;
                 self.wait = 8;
                 disasm!("LD (HL+), A");
             }
             0x32 => {
-                let mut hl = (self.h as u16) << 8 | self.h as u16;
+                let mut hl = (self.h as u16) << 8 | self.l as u16;
                 self.bus.write(hl, self.a);
-                hl -= 1;
+                hl = u16::wrapping_sub(hl, 1);
                 self.h = (hl >> 8) as u8;
                 self.l = (hl & 0xff) as u8;
                 self.wait = 8;
@@ -499,18 +522,18 @@ impl<'a> Cpu<'a> {
                 disasm!("LD A, (DE)");
             }
             0x2a => {
-                let mut hl = (self.h as u16) << 8 | self.h as u16;
+                let mut hl = (self.h as u16) << 8 | self.l as u16;
                 self.a = self.bus.read(hl);
-                hl += 1;
+                hl = u16::wrapping_add(hl, 1);
                 self.h = (hl >> 8) as u8;
                 self.l = (hl & 0xff) as u8;
                 self.wait = 8;
                 disasm!("LD A, (HL+)");
             }
             0x3a => {
-                let mut hl = (self.h as u16) << 8 | self.h as u16;
+                let mut hl = (self.h as u16) << 8 | self.l as u16;
                 self.a = self.bus.read(hl);
-                hl -= 1;
+                hl = u16::wrapping_sub(hl, 1);
                 self.h = (hl >> 8) as u8;
                 self.l = (hl & 0xff) as u8;
                 self.wait = 8;
@@ -585,10 +608,24 @@ impl<'a> Cpu<'a> {
                 self.pc += 1;
             }
             0xf9 => {
-                self.sp = (self.h as u16) << 8 | self.h as u16;
+                self.sp = (self.h as u16) << 8 | self.l as u16;
                 self.wait = 8;
                 disasm!("LD SP, HL");
             }
+            0x04 => inc!(b),
+            0x14 => inc!(d),
+            0x24 => inc!(h),
+            0x0c => inc!(c),
+            0x1c => inc!(e),
+            0x2c => inc!(l),
+            0x3c => inc!(a),
+            0x05 => dec!(b),
+            0x15 => dec!(d),
+            0x25 => dec!(h),
+            0x0d => dec!(c),
+            0x1d => dec!(e),
+            0x2d => dec!(l),
+            0x3d => dec!(a),
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
             }
@@ -596,7 +633,7 @@ impl<'a> Cpu<'a> {
         self.pc += 1;
     }
     /*
-    let mut hl = (self.h as u16) << 8 | self.h as u16;
+    let mut hl = (self.h as u16) << 8 | self.l as u16;
     hl += 1;
     self.h = (hl >> 8) as u8;
     self.l = (hl & 0xff) as u8;
