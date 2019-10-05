@@ -936,6 +936,76 @@ impl<'a> Cpu<'a> {
                 cmpA!(hl);
                 self.wait = 8;
             }
+            0xc6 => {
+                let arg = self.bus.cartridge.read(self.pc +1 );
+                let (new_a, carry) = u8::overflowing_add(arg, self.a);
+                self.zerof = if new_a == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((arg & 0xf) + self.a & 0xf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry {1} else {0};
+                self.a = new_a;
+                self.wait = 8;
+                self.pc += 1;
+                disasm!("Add a, {:#x}", arg);
+            }
+            0xd6 => {
+                let arg = self.bus.cartridge.read(self.pc +1 );
+                let (new_a, carry) = u8::overflowing_sub(self.a, arg);
+                self.zerof = if new_a == 0 {1} else {0};
+                self.add_subf = 1;
+                self.half_carryf = if self.a & 0xf > (arg & 0xf) {0} else {1};
+                self.carryf = if carry {1} else {0};
+                self.a = new_a;
+                self.wait = 8;
+                self.pc += 1;
+                disasm!("Sub a, {:#}", arg);
+            },
+            0xce => {
+                let arg = self.bus.cartridge.read(self.pc +1 );
+                let (new_a, carry) = u8::overflowing_add(arg, self.a);
+                let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
+                self.zerof = if new_a2 == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((arg & 0xf) + self.a & 0xf + self.carryf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry || carry2 {1} else {0};
+                self.a = new_a2;
+                self.wait = 8;
+                self.pc += 1;
+                disasm!("Adc a, {:#x}", arg);
+            },
+            0xde => {
+                let arg = self.bus.cartridge.read(self.pc +1 );
+                let (new_a, carry) = u8::overflowing_sub(self.a, arg);
+                let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
+                self.zerof = if new_a2 == 0 {1} else {0};
+                self.add_subf = 1;
+                self.half_carryf = if (self.a & 0xf - (arg & 0xf) - self.carryf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry || carry2 {1} else {0};
+                self.a = new_a;
+                self.wait = 8;
+                self.pc += 1;
+                disasm!("Sbc a, {:#}", arg);
+            },
+            0xe6 => {
+                let arg8 = self.bus.cartridge.read(self.pc +1 );
+                andA!(arg8);
+                self.wait = 8;
+            },
+            0xf6 => {
+                let arg8 = self.bus.cartridge.read(self.pc +1 );
+                orA!(arg8);
+                self.wait = 8;
+            },
+            0xee => {
+                let arg8 = self.bus.cartridge.read(self.pc +1 );
+                xorA!(arg8);
+                self.wait = 8;
+            },
+            0xfe => {
+                let arg8 = self.bus.cartridge.read(self.pc +1 );
+                cmpA!(arg8);
+                self.wait = 8;
+            }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
             }
