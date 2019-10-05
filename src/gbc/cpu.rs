@@ -679,6 +679,35 @@ impl<'a> Cpu<'a> {
                 disasm!("INC SP");
                 self.wait = 8;
             }
+            0x0b => {
+                let mut bc = (self.b as u16) << 8 | self.c as u16;
+                bc = u16::wrapping_sub(bc, 1);
+                self.c = (bc & 0xff) as u8;
+                self.b = (bc >> 8) as u8;
+                disasm!("DEC BC");
+                self.wait = 8;
+            }
+            0x1b => {
+                let mut de = (self.d as u16) << 8 | self.e as u16;
+                de = u16::wrapping_sub(de, 1);
+                self.e = (de & 0xff) as u8;
+                self.d = (de >> 8) as u8;
+                disasm!("DEC DE");
+                self.wait = 8;
+            }
+            0x2b => {
+                let mut hl = (self.h as u16) << 8 | self.b as u16;
+                hl = u16::wrapping_sub(hl, 1);
+                self.l = (hl & 0xff) as u8;
+                self.h = (hl >> 8) as u8;
+                disasm!("DEC HL");
+                self.wait = 8;
+            }
+            0x3b => {
+                self.sp = u16::wrapping_sub(self.sp, 1);
+                disasm!("DEC SP");
+                self.wait = 8;
+            }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
             }
