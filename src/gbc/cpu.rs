@@ -128,13 +128,13 @@ impl<'a> Cpu<'a> {
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 4;
-                disasm!("Add a {}", stringify!($arg));
+                disasm!("Add a, {}", stringify!($arg));
             });
         }
 
         macro_rules! subA {
             ($arg:ident) => ({
-                let before = self.a;
+                let before = self.$arg;
                 let (new_a, carry) = u8::overflowing_sub(self.a, self.$arg);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 1;
@@ -142,7 +142,7 @@ impl<'a> Cpu<'a> {
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 4;
-                disasm!("Add a {}", stringify!($arg));
+                disasm!("Sub a, {}", stringify!($arg));
             });
         }
 
@@ -163,7 +163,7 @@ impl<'a> Cpu<'a> {
 
         macro_rules! sbcA {
             ($arg:ident) => ({
-                let before = self.a;
+                let before = self.$arg;
                 let (new_a, carry) = u8::overflowing_sub(self.a, self.$arg);
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
@@ -173,6 +173,54 @@ impl<'a> Cpu<'a> {
                 self.a = new_a;
                 self.wait = 4;
                 disasm!("SBC a, {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! andA {
+            ($arg:expr) => ({
+                self.a &= $arg;
+                self.zerof = if self.a == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = 1;
+                self.carryf = 0;
+                self.wait = 4;
+                disasm!("And A, {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! orA {
+            ($arg:expr) => ({
+                self.a |= $arg;
+                self.zerof = if self.a == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = 0;
+                self.carryf = 0;
+                self.wait = 4;
+                disasm!("Or A, {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! xorA {
+            ($arg:expr) => ({
+                self.a |= $arg;
+                self.zerof = if self.a == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = 0;
+                self.carryf = 0;
+                self.wait = 4;
+                disasm!("Xor A, {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! cmpA {
+            ($arg:expr) => ({
+                let (new_a, carry) = u8::overflowing_sub(self.a, $arg);
+                self.zerof = if new_a == 0 {1} else {0};
+                self.add_subf = 1;
+                self.half_carryf = if $arg & 0xf > (self.a & 0xf) {0} else {1};
+                self.carryf = if carry {1} else {0};
+                self.wait = 4;
+                disasm!("Cmp A, {}", stringify!($arg));
             });
         }
 
@@ -839,6 +887,54 @@ impl<'a> Cpu<'a> {
                 self.a = new_a;
                 self.wait = 8;
                 disasm!("SBC a, (HL)");
+            }
+            0xa0 => andA!(self.b),
+            0xa1 => andA!(self.c),
+            0xa2 => andA!(self.d),
+            0xa3 => andA!(self.e),
+            0xa4 => andA!(self.h),
+            0xa5 => andA!(self.l),
+            0xa7 => andA!(self.a),
+            0xb0 => orA!(self.b),
+            0xb1 => orA!(self.c),
+            0xb2 => orA!(self.d),
+            0xb3 => orA!(self.e),
+            0xb4 => orA!(self.h),
+            0xb5 => orA!(self.l),
+            0xb7 => orA!(self.a),
+            0xa6 => {
+                let hl = self.bus.read((self.h as u16) << 8 | self.l as u16);
+                andA!(hl);
+                self.wait = 8;
+            }
+            0xb6 => {
+                let hl = self.bus.read((self.h as u16) << 8 | self.l as u16);
+                orA!(hl);
+                self.wait = 8;
+            }
+            0xa8 => xorA!(self.b),
+            0xa9 => xorA!(self.c),
+            0xaa => xorA!(self.d),
+            0xab => xorA!(self.e),
+            0xac => xorA!(self.h),
+            0xad => xorA!(self.l),
+            0xaf => xorA!(self.a),
+            0xb8 => cmpA!(self.b),
+            0xb9 => cmpA!(self.c),
+            0xba => cmpA!(self.d),
+            0xbb => cmpA!(self.e),
+            0xbc => cmpA!(self.h),
+            0xbd => cmpA!(self.l),
+            0xbf => cmpA!(self.a),
+            0xae => {
+                let hl = self.bus.read((self.h as u16) << 8 | self.l as u16);
+                xorA!(hl);
+                self.wait = 8;
+            }
+            0xbe => {
+                let hl = self.bus.read((self.h as u16) << 8 | self.l as u16);
+                cmpA!(hl);
+                self.wait = 8;
             }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
