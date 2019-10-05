@@ -20,7 +20,7 @@ pub struct Cpu<'a> {
     half_carryf: u8,
     carryf: u8,
 
-    wait: u8,
+    wait: i32,
 }
 
 const ZERO : u8 = 7;
@@ -80,6 +80,11 @@ impl<'a> Cpu<'a> {
     }
 
     pub fn tick(&mut self) {
+        self.wait -= 1;
+        if self.wait > 0 {
+            return;
+        }
+
         macro_rules! disasm {
             ($($arg:tt)+) => (
                 if cfg!(debug_assertions) {
@@ -95,34 +100,31 @@ impl<'a> Cpu<'a> {
                 disasm!("NOP");
             }
             0x1 => {
-                self.c = self.bus.read(self.pc);
-                self.pc += 1;
-                self.b = self.bus.read(self.pc);
-                self.pc += 1;
-                self.wait = 12;
+                self.c = self.bus.read(self.pc+1);
+                self.b = self.bus.read(self.pc+2);
                 disasm!("LD BC, 0x{:x}{:x}", self.b, self.c);
+                self.wait = 12;
+                self.pc += 2;
             }
             0x11 => {
-                self.e = self.bus.read(self.pc);
-                self.pc += 1;
-                self.d = self.bus.read(self.pc);
-                self.pc += 1;
-                self.wait = 12;
+                self.e = self.bus.read(self.pc+1);
+                self.d = self.bus.read(self.pc+2);
                 disasm!("LD DE, 0x{:x}{:x}", self.d, self.e);
+                self.wait = 12;
+                self.pc += 2;
             }
             0x21 => {
-                self.l = self.bus.read(self.pc);
-                self.pc += 1;
-                self.h = self.bus.read(self.pc);
-                self.pc += 1;
-                self.wait = 12;
+                self.l = self.bus.read(self.pc+1);
+                self.h = self.bus.read(self.pc+2);
                 disasm!("LD HL, 0x{:x}{:x}", self.h, self.l);
+                self.wait = 12;
+                self.pc += 2;
             }
             0x31 => {
-                self.sp = self.bus.read(self.pc) as u16 | (self.bus.read(self.pc+1) as u16) << 8;
-                self.pc += 2;
-                self.wait = 12;
+                self.sp = self.bus.read(self.pc+1) as u16 | (self.bus.read(self.pc+2) as u16) << 8;
                 disasm!("LD HL, 0x{:x}", self.sp);
+                self.wait = 12;
+                self.pc += 2;
             }
             0x40 => {
                 self.b = self.b;
@@ -464,27 +466,27 @@ impl<'a> Cpu<'a> {
             }
             0x06 => {
                 self.b = self.bus.cartridge.read(self.pc + 1);
-                self.pc += 1;
-                self.wait = 8;
                 disasm!("LD B, d8");
+                self.wait = 8;
+                self.pc += 1;
             }
             0x16 => {
                 self.d = self.bus.cartridge.read(self.pc + 1);
-                self.pc += 1;
-                self.wait = 8;
                 disasm!("LD D, d8");
+                self.wait = 8;
+                self.pc += 1;
             }
             0x26 => {
                 self.h = self.bus.cartridge.read(self.pc + 1);
-                self.pc += 1;
-                self.wait = 8;
                 disasm!("LD H, d8");
+                self.wait = 8;
+                self.pc += 1;
             }
             0x36 => {
                 self.bus.write((self.h as u16) << 8 | self.l as u16, self.bus.cartridge.read(self.pc + 1));
-                self.pc += 1;
-                self.wait = 12;
                 disasm!("LD (HL), d8");
+                self.wait = 12;
+                self.pc += 1;
             }
             0x0a => {
                 self.a = self.bus.read((self.b as u16) << 8 | self.c as u16);
@@ -516,59 +518,57 @@ impl<'a> Cpu<'a> {
             }
             0x0e => {
                 self.c = self.bus.cartridge.read(self.pc + 1);
-                self.pc += 1;
-                self.wait = 8;
                 disasm!("LD C, d8");
+                self.wait = 8;
+                self.pc += 1;
             }
             0x1e => {
                 self.e = self.bus.cartridge.read(self.pc + 1);
-                self.pc += 1;
-                self.wait = 8;
                 disasm!("LD E, d8");
+                self.wait = 8;
+                self.pc += 1;
             }
             0x2e => {
                 self.l = self.bus.cartridge.read(self.pc + 1);
-                self.pc += 1;
-                self.wait = 8;
                 disasm!("LD L, d8");
+                self.wait = 8;
+                self.pc += 1;
             }
             0x3e => {
                 self.a = self.bus.cartridge.read(self.pc + 1);
-                self.pc += 1;
-                self.wait = 8;
                 disasm!("LD A, d8");
+                self.wait = 8;
+                self.pc += 1;
             }
             0x08 => {
                 let low = self.bus.cartridge.read(self.pc + 1);
                 let high = self.bus.cartridge.read(self.pc + 2);
                 self.bus.write16((high as u16) << 8 | low as u16, self.sp);
-                self.pc += 2;
-                self.wait = 20;
                 disasm!("LD (a16), SP");
+                self.wait = 20;
+                self.pc += 2;
             }
             0xe0 => {
                 let a8 = self.bus.cartridge.read(self.pc + 1);
                 self.bus.write( a8 as u16 | 0xFF00, self.a);
-                self.pc += 1;
-                self.wait = 12;
                 disasm!("LDH (a8), A");
+                self.wait = 12;
+                self.pc += 1;
             }
             0xf0 => {
                 let a8 = self.bus.cartridge.read(self.pc + 1);
                 self.a = self.bus.read( a8 as u16 | 0xFF00);
-                self.pc += 1;
-                self.wait = 12;
                 disasm!("LDH A, (a8)");
+                self.wait = 12;
+                self.pc += 1;
             }
             0xe2 => {
                 self.bus.write( self.c as u16 | 0xFF00, self.a);
-                self.pc += 1;
-                self.wait = 8;
                 disasm!("LDH (C), A");
+                self.wait = 8;
             }
             0xf2 => {
                 self.a = self.bus.read( self.c as u16 | 0xFF00);
-                self.pc += 1;
                 self.wait = 8;
                 disasm!("LDH A, (C)");
             }
@@ -580,9 +580,9 @@ impl<'a> Cpu<'a> {
                 self.half_carryf = if ((r8 as u16) & 0xF + (self.sp & 0xF)) & 0x10 != 0 {1} else {0};
                 self.zerof = 0;
                 self.add_subf = 0;
-                self.pc += 1;
-                self.wait = 12;
                 disasm!("LDH A, (a8)");
+                self.wait = 12;
+                self.pc += 1;
             }
             0xf9 => {
                 self.sp = (self.h as u16) << 8 | self.h as u16;

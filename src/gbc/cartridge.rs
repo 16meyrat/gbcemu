@@ -36,7 +36,10 @@ struct NRom {
 
 impl Cartridge for NRom {
     fn read(&self, addr: u16) -> u8{
-        0
+        match addr {
+            x if x < 0x8000 => self.banks[addr as usize],
+            _ => panic!("Illegal cartridge read at {:#x}", addr),
+        }
     }
     fn write(&mut self, addr: u16, val: u8){
 
