@@ -112,9 +112,67 @@ impl<'a> Cpu<'a> {
                 self.$arg = u8::wrapping_sub(self.$arg, 1);
                 self.zerof = if self.$arg == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = if (before & 0xf) == 0 {0} else {1};
+                self.half_carryf = if (before & 0xf) == 0 {1} else {0};
                 self.wait = 4;
                 disasm!("Dec {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! addA {
+            ($arg:ident) => ({
+                let before = self.a;
+                let (new_a, carry) = u8::overflowing_add(self.$arg, self.a);
+                self.zerof = if new_a == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((before & 0xf) + self.a & 0xf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry {1} else {0};
+                self.a = new_a;
+                self.wait = 4;
+                disasm!("Add a {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! subA {
+            ($arg:ident) => ({
+                let before = self.a;
+                let (new_a, carry) = u8::overflowing_sub(self.a, self.$arg);
+                self.zerof = if new_a == 0 {1} else {0};
+                self.add_subf = 1;
+                self.half_carryf = if self.a & 0xf > (before & 0xf) {0} else {1};
+                self.carryf = if carry {1} else {0};
+                self.a = new_a;
+                self.wait = 4;
+                disasm!("Add a {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! adcA {
+            ($arg:ident) => ({
+                let before = self.a;
+                let (new_a, carry) = u8::overflowing_add(self.$arg, self.a);
+                let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
+                self.zerof = if new_a2 == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((before & 0xf) + self.a & 0xf + self.carryf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry || carry2 {1} else {0};
+                self.a = new_a2;
+                self.wait = 4;
+                disasm!("Adc a, {}", stringify!($arg));
+            });
+        }
+
+        macro_rules! sbcA {
+            ($arg:ident) => ({
+                let before = self.a;
+                let (new_a, carry) = u8::overflowing_sub(self.a, self.$arg);
+                let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
+                self.zerof = if new_a2 == 0 {1} else {0};
+                self.add_subf = 1;
+                self.half_carryf = if (self.a & 0xf - (before & 0xf) - self.carryf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry || carry2 {1} else {0};
+                self.a = new_a;
+                self.wait = 4;
+                disasm!("SBC a, {}", stringify!($arg));
             });
         }
 
@@ -696,7 +754,7 @@ impl<'a> Cpu<'a> {
                 self.wait = 8;
             }
             0x2b => {
-                let mut hl = (self.h as u16) << 8 | self.b as u16;
+                let mut hl = (self.h as u16) << 8 | self.l as u16;
                 hl = u16::wrapping_sub(hl, 1);
                 self.l = (hl & 0xff) as u8;
                 self.h = (hl >> 8) as u8;
@@ -707,6 +765,80 @@ impl<'a> Cpu<'a> {
                 self.sp = u16::wrapping_sub(self.sp, 1);
                 disasm!("DEC SP");
                 self.wait = 8;
+            }
+            0x80 => addA!(b),
+            0x81 => addA!(c),
+            0x82 => addA!(d),
+            0x83 => addA!(e),
+            0x84 => addA!(h),
+            0x85 => addA!(l),
+            0x87 => addA!(a),
+            0x90 => subA!(b),
+            0x91 => subA!(c),
+            0x92 => subA!(d),
+            0x93 => subA!(e),
+            0x94 => subA!(h),
+            0x95 => subA!(l),
+            0x97 => subA!(a),
+            0x88 => adcA!(b),
+            0x89 => adcA!(c),
+            0x8a => adcA!(d),
+            0x8b => adcA!(e),
+            0x8c => adcA!(h),
+            0x8d => adcA!(l),
+            0x8f => adcA!(a),
+            0x98 => sbcA!(b),
+            0x99 => sbcA!(c),
+            0x9a => sbcA!(d),
+            0x9b => sbcA!(e),
+            0x9c => sbcA!(h),
+            0x9d => sbcA!(l),
+            0x9f => sbcA!(a),
+            0x86 => {
+                let val = self.bus.read((self.h as u16) << 8 | self.l as u16);
+                let (new_a, carry) = u8::overflowing_add(val, self.a);
+                self.zerof = if new_a == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((self.a & 0xf) + val & 0xf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry {1} else {0};
+                self.a = new_a;
+                self.wait = 8;
+                disasm!("Add a (HL)");
+            }
+            0x96 => {
+                let val = self.bus.read((self.h as u16) << 8 | self.l as u16);
+                let (new_a, carry) = u8::overflowing_sub(self.a, val);
+                self.zerof = if new_a == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((self.a & 0xf) - val & 0xf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry {1} else {0};
+                self.a = new_a;
+                self.wait = 8;
+                disasm!("Sub a (HL)");
+            }
+            0x8e => {
+                let val = self.bus.read((self.h as u16) << 8 | self.l as u16);
+                let (new_a, carry) = u8::overflowing_add(self.a, val);
+                let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
+                self.zerof = if new_a2 == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((self.a & 0xf) + self.a & 0xf + self.carryf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry || carry2 {1} else {0};
+                self.a = new_a2;
+                self.wait = 8;
+                disasm!("Adc a, (HL)");
+            }
+            0x9e => {
+                let val = self.bus.read((self.h as u16) << 8 | self.l as u16);
+                let (new_a, carry) = u8::overflowing_sub(self.a, val);
+                let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
+                self.zerof = if new_a2 == 0 {1} else {0};
+                self.add_subf = 1;
+                self.half_carryf = if (self.a & 0xf - (val & 0xf) - self.carryf) & 0x10 != 0 {1} else {0};
+                self.carryf = if carry || carry2 {1} else {0};
+                self.a = new_a;
+                self.wait = 8;
+                disasm!("SBC a, (HL)");
             }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
