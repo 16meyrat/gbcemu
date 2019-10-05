@@ -2,16 +2,16 @@ use super::bus::Busable;
 
 
 pub struct Ram {
-    bank0: [u8; 0x800],
-    banks: Vec<[u8; 0x800]>,
+    bank0: [u8; 0x1000],
+    banks: Vec<[u8; 0x1000]>,
     current_bank: usize,
 }
 
 impl Ram {
     pub fn new() -> Self{
         Ram{
-            bank0: [0; 0x800],
-            banks: vec![[0; 0x800]; 6],
+            bank0: [0; 0x1000],
+            banks: vec![[0; 0x1000]; 6],
             current_bank: 0,
         }
     }
