@@ -101,6 +101,7 @@ impl<'a> Cpu<'a> {
                 self.zerof = if self.$arg == 0 {1} else {0};
                 self.add_subf = 0;
                 self.half_carryf = if ((before & 0xf) + 1) & 0x10 != 0 {1} else {0};
+                self.wait = 4;
                 disasm!("Inc {}", stringify!($arg));
             });
         }
@@ -112,6 +113,7 @@ impl<'a> Cpu<'a> {
                 self.zerof = if self.$arg == 0 {1} else {0};
                 self.add_subf = 1;
                 self.half_carryf = if (before & 0xf) == 0 {0} else {1};
+                self.wait = 4;
                 disasm!("Dec {}", stringify!($arg));
             });
         }
@@ -626,6 +628,28 @@ impl<'a> Cpu<'a> {
             0x1d => dec!(e),
             0x2d => dec!(l),
             0x3d => dec!(a),
+            0x34 => {
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                let x = self.bus.read(hl);
+                let res = u8::wrapping_add(x, 1);
+                self.zerof = if res == 0 {1} else {0};
+                self.add_subf = 0;
+                self.half_carryf = if ((x & 0xf) + 1) & 0x10 != 0 {1} else {0};
+                self.bus.write(hl, res);
+                disasm!("INC (HL)");
+                self.wait = 12;
+            }
+            0x35 => {
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                let x = self.bus.read(hl);
+                let res = u8::wrapping_sub(x, 1);
+                self.zerof = if res == 0 {1} else {0};
+                self.add_subf = 1;
+                self.half_carryf = if (x & 0xf) == 0 {1} else {0};
+                self.bus.write(hl, res);
+                disasm!("DEC (HL)");
+                self.wait = 12;
+            }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
             }
