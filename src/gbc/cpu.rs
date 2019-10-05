@@ -41,7 +41,7 @@ impl<'a> Cpu<'a> {
             h: 0,
             l: 0,
             pc: 0,
-            sp: 0,
+            sp: 0xfff4,
             
             zerof: 0,
             add_subf: 0,
@@ -61,6 +61,7 @@ impl<'a> Cpu<'a> {
         self.h = 0;
         self.l = 0;
         self.pc = 0;
+        self.sp = 0xfff4;
         
         self.zerof = 0;
         self.add_subf = 0;
@@ -168,7 +169,7 @@ impl<'a> Cpu<'a> {
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = if (self.a & 0xf - (before & 0xf) - self.carryf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if self.a & 0xf < (before & 0xf) + self.carryf {1} else {0};
                 self.carryf = if carry || carry2 {1} else {0};
                 self.a = new_a;
                 self.wait = 4;
@@ -705,7 +706,8 @@ impl<'a> Cpu<'a> {
             }
             0xf8 => {
                 let r8 = self.bus.cartridge.read(self.pc + 1);
-                self.a = self.bus.read( r8 as u16 + self.sp);
+                let addr = u16::wrapping_add(r8 as i8 as i16 as u16, self.sp);
+                self.a = self.bus.read(addr);
                 let (_, overflow) = u8::overflowing_add(r8, (self.sp & 0xff) as u8);
                 self.carryf = if overflow {1} else {0};
                 self.half_carryf = if ((r8 as u16) & 0xF + (self.sp & 0xF)) & 0x10 != 0 {1} else {0};
