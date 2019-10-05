@@ -486,12 +486,121 @@ impl<'a> Cpu<'a> {
                 self.wait = 12;
                 disasm!("LD (HL), d8");
             }
+            0x0a => {
+                self.a = self.bus.read((self.b as u16) << 8 | self.c as u16);
+                self.wait = 8;
+                disasm!("LD A, (BC)");
+            }
+            0x1a => {
+                self.a = self.bus.read((self.d as u16) << 8 | self.e as u16);
+                self.wait = 8;
+                disasm!("LD A, (DE)");
+            }
+            0x2a => {
+                let mut hl = (self.h as u16) << 8 | self.h as u16;
+                self.a = self.bus.read(hl);
+                hl += 1;
+                self.h = (hl >> 8) as u8;
+                self.l = (hl & 0xff) as u8;
+                self.wait = 8;
+                disasm!("LD A, (HL+)");
+            }
+            0x3a => {
+                let mut hl = (self.h as u16) << 8 | self.h as u16;
+                self.a = self.bus.read(hl);
+                hl -= 1;
+                self.h = (hl >> 8) as u8;
+                self.l = (hl & 0xff) as u8;
+                self.wait = 8;
+                disasm!("LD A, (HL-)");
+            }
+            0x0e => {
+                self.c = self.bus.cartridge.read(self.pc + 1);
+                self.pc += 1;
+                self.wait = 8;
+                disasm!("LD C, d8");
+            }
+            0x1e => {
+                self.e = self.bus.cartridge.read(self.pc + 1);
+                self.pc += 1;
+                self.wait = 8;
+                disasm!("LD E, d8");
+            }
+            0x2e => {
+                self.l = self.bus.cartridge.read(self.pc + 1);
+                self.pc += 1;
+                self.wait = 8;
+                disasm!("LD L, d8");
+            }
+            0x3e => {
+                self.a = self.bus.cartridge.read(self.pc + 1);
+                self.pc += 1;
+                self.wait = 8;
+                disasm!("LD A, d8");
+            }
+            0x08 => {
+                let low = self.bus.cartridge.read(self.pc + 1);
+                let high = self.bus.cartridge.read(self.pc + 2);
+                self.bus.write16((high as u16) << 8 | low as u16, self.sp);
+                self.pc += 2;
+                self.wait = 20;
+                disasm!("LD (a16), SP");
+            }
+            0xe0 => {
+                let a8 = self.bus.cartridge.read(self.pc + 1);
+                self.bus.write( a8 as u16 | 0xFF00, self.a);
+                self.pc += 1;
+                self.wait = 12;
+                disasm!("LDH (a8), A");
+            }
+            0xf0 => {
+                let a8 = self.bus.cartridge.read(self.pc + 1);
+                self.a = self.bus.read( a8 as u16 | 0xFF00);
+                self.pc += 1;
+                self.wait = 12;
+                disasm!("LDH A, (a8)");
+            }
+            0xe2 => {
+                self.bus.write( self.c as u16 | 0xFF00, self.a);
+                self.pc += 1;
+                self.wait = 8;
+                disasm!("LDH (C), A");
+            }
+            0xf2 => {
+                self.a = self.bus.read( self.c as u16 | 0xFF00);
+                self.pc += 1;
+                self.wait = 8;
+                disasm!("LDH A, (C)");
+            }
+            0xf8 => {
+                let r8 = self.bus.cartridge.read(self.pc + 1);
+                self.a = self.bus.read( r8 as u16 + self.sp);
+                let (_, overflow) = u8::overflowing_add(r8, (self.sp & 0xff) as u8);
+                self.carryf = if overflow {1} else {0};
+                self.half_carryf = if ((r8 as u16) & 0xF + (self.sp & 0xF)) & 0x10 != 0 {1} else {0};
+                self.zerof = 0;
+                self.add_subf = 0;
+                self.pc += 1;
+                self.wait = 12;
+                disasm!("LDH A, (a8)");
+            }
+            0xf9 => {
+                self.sp = (self.h as u16) << 8 | self.h as u16;
+                self.wait = 8;
+                disasm!("LD SP, HL");
+            }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
             }
         };
         self.pc += 1;
     }
+    /*
+    let mut hl = (self.h as u16) << 8 | self.h as u16;
+    hl += 1;
+    self.h = (hl >> 8) as u8;
+    self.l = (hl & 0xff) as u8;
+        */
 
 }
 

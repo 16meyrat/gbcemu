@@ -18,4 +18,8 @@ impl Busable for Ppu {
     fn write(&mut self, addr: u16, val: u8){
 
     }
+
+    fn write16(&mut self, addr: u16, val: u16){
+
+    }
 }

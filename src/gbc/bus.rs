@@ -12,6 +12,7 @@ pub struct Bus<'a>{
 pub trait Busable {
     fn read(&self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, value: u8);
+    fn write16(&mut self, addr: u16, value: u16);
 }
 
 impl<'a> Busable for Bus<'a> {
@@ -33,6 +34,16 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xc00 => self.cartridge.write(addr, value),
             x if x < 0xe00 => self.ram.write(addr, value),
             x if x < 0xFE00 => self.ram.write(addr - 0x2000, value),
+            _ => {}
+        };
+    }
+    fn write16(&mut self, addr: u16, value: u16){
+        match addr {
+            x if x < 0x800 => self.cartridge.write16(addr, value),
+            x if x < 0xa00 => self.ppu.write16(addr, value),
+            x if x < 0xc00 => self.cartridge.write16(addr, value),
+            x if x < 0xe00 => self.ram.write16(addr, value),
+            x if x < 0xFE00 => self.ram.write16(addr - 0x2000, value),
             _ => {}
         };
     }

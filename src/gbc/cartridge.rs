@@ -7,6 +7,7 @@ use std::convert::TryFrom;
 pub trait Cartridge {
     fn read(&self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, val: u8);
+    fn write16(&mut self, addr: u16, value: u16);
 }
 
 pub fn load_rom(path: &str) -> Box<dyn Cartridge> {
@@ -38,6 +39,10 @@ impl Cartridge for NRom {
         0
     }
     fn write(&mut self, addr: u16, val: u8){
+
+    }
+
+    fn write16(&mut self, addr: u16, value: u16){
 
     }
 }
