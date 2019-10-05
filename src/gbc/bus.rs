@@ -6,7 +6,7 @@ use super::cartridge::Cartridge;
 pub struct Bus<'a>{
     ppu: Ppu,
     ram: Ram,
-    cartridge: &'a mut dyn Cartridge,
+    pub cartridge: &'a mut dyn Cartridge,
 }
 
 pub trait Busable {
