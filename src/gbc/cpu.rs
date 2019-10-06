@@ -133,6 +133,20 @@ impl<'a> Cpu<'a> {
             });
         }
 
+        macro_rules! addHL {
+            ($arg:ident) => ({
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                let (res, carry) = u16::overflowing_add(hl, $arg);
+                self.add_subf = 0;
+                self.carryf = carry as u8;
+                self.half_carryf = if ((hl >> 8 & 0xf) + ($arg >> 8 & 0xf)) & 0x10 != 0 {1} else {0};
+                self.h = (res >> 8) as u8;
+                self.l = res as u8;
+                self.wait = 8;
+                disasm!("Add HL, {}", $arg);
+            });
+        }
+
         macro_rules! subA {
             ($arg:ident) => ({
                 let before = self.$arg;
@@ -1007,7 +1021,23 @@ impl<'a> Cpu<'a> {
                 let arg8 = self.bus.cartridge.read(self.pc +1 );
                 cmpA!(arg8);
                 self.wait = 8;
-            }
+            },
+            0x09 => {
+                let bc = ((self.b as u16) << 8) | self.c as u16;
+                addHL!(bc);
+            },
+            0x19 => {
+                let de = ((self.d as u16) << 8) | self.e as u16;
+                addHL!(de);
+            },
+            0x29 => {
+                let hl = ((self.h as u16) << 8) | self.l as u16;
+                addHL!(hl);
+            },
+            0x39 => {
+                let sp = self.sp;
+                addHL!(sp);
+            },
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
             }
