@@ -147,6 +147,26 @@ impl<'a> Cpu<'a> {
             });
         }
 
+        macro_rules! push16 {
+            ($arg:ident) => {
+                self.sp -= 2;
+                self.bus.write16(self.sp, $arg);
+                self.wait = 16;
+                disasm!("PUSH {}", stringify!($arg))
+            };
+        }
+
+        macro_rules! pop16 {
+            ($h:ident, $l:ident) => {
+                *$l = self.bus.read(self.sp);
+                self.sp += 1;
+                *$h = self.bus.read(self.sp);
+                self.sp += 1;
+                self.wait = 12;
+                disasm!("POP {}{}", stringify!($h), stringify!($l));
+            };
+        }
+
         macro_rules! subA {
             ($arg:ident) => ({
                 let before = self.$arg;
@@ -1037,6 +1057,44 @@ impl<'a> Cpu<'a> {
             0x39 => {
                 let sp = self.sp;
                 addHL!(sp);
+            },
+            0xc5 => {
+                let bc = ((self.b as u16) << 8) | self.c as u16;
+                push16!(bc);
+            },
+            0xd5 => {
+                let de = ((self.d as u16) << 8) | self.e as u16;
+                push16!(de);
+            },
+            0xe5 => {
+                let hl = ((self.h as u16) << 8) | self.l as u16;
+                push16!(hl);
+            },
+            0xf5 => {
+                let af = ((self.a as u16) << 8) | self.flags() as u16;
+                push16!(af);
+            },
+            0xc1 => {
+                let b = &mut self.b;
+                let c = &mut self.c;
+                pop16!(b, c);
+            },
+            0xd1 => {
+                let d = &mut self.d;
+                let e = &mut self.e;
+                pop16!(d, e);
+            },
+            0xe1 => {
+                let h = &mut self.h;
+                let l = &mut self.l;
+                pop16!(h, l);
+            },
+            0xf1 => {
+                let mut flags = self.flags();
+                let f = &mut flags;
+                let a = &mut self.a;
+                pop16!(a, f);
+                self.set_flags(flags);
             },
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
