@@ -276,6 +276,14 @@ impl<'a> Cpu<'a> {
             addr
         };
 
+        fn jrel (this: &mut Cpu) -> u8 {
+            let addr = this.bus.cartridge.read(this.pc+1);
+            this.pc = u16::wrapping_add(this.pc, addr as i8 as u16);
+            this.wait = 12;
+            this.pc = u16::wrapping_sub(this.pc, 1);
+            addr
+        };
+
         let op = self.bus.cartridge.read(self.pc);
         match op {
             0x0 => {
@@ -1141,7 +1149,7 @@ impl<'a> Cpu<'a> {
                 }
             }
             0xca => {
-                if self.carryf == 0 {
+                if self.zerof == 0 {
                     self.wait = 12;
                     disasm!("JP Z, <no_jump>");
                     self.pc += 2;
@@ -1167,6 +1175,55 @@ impl<'a> Cpu<'a> {
                 disasm!("JP HL:{:#x}", hl);
                 self.wait = 4;
                 self.pc = u16::wrapping_sub(hl, 1);
+            }
+            0x18 => {
+                let pc = self.pc;
+                let addr = jrel(self);
+                disasm_pc!(pc, "JR {:#x}", addr);
+            }
+            0x20 => {
+                if self.zerof != 0 {
+                    self.wait = 8;
+                    disasm!("JR NZ, <no_jump>");
+                    self.pc += 1;
+                }else{
+                    let pc = self.pc;
+                    let addr = jrel(self);
+                    disasm_pc!(pc, "JR NZ, {:#x}", addr);
+                }
+            }
+            0x30 => {
+                if self.carryf != 0 {
+                    self.wait = 8;
+                    disasm!("JR NC, <no_jump>");
+                    self.pc += 1;
+                }else{
+                    let pc = self.pc;
+                    let addr = jrel(self);
+                    disasm_pc!(pc, "JR NC, {:#x}", addr);
+                }
+            }
+            0x28 => {
+                if self.zerof == 0 {
+                    self.wait = 8;
+                    disasm!("JR Z, <no_jump>");
+                    self.pc += 1;
+                }else{
+                    let pc = self.pc;
+                    let addr = jrel(self);
+                    disasm_pc!(pc, "JR NZ, {:#x}", addr);
+                }
+            }
+            0x38 => {
+                if self.carryf == 0 {
+                    self.wait = 8;
+                    disasm!("JR C, <no_jump>");
+                    self.pc += 1;
+                }else{
+                    let pc = self.pc;
+                    let addr = jrel(self);
+                    disasm_pc!(pc, "JR NC, {:#x}", addr);
+                }
             }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
