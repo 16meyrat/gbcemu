@@ -21,6 +21,7 @@ pub struct Cpu<'a> {
     carryf: u8,
 
     wait: i32,
+    interrupts_enabled: bool,
 }
 
 const ZERO : u8 = 7;
@@ -49,6 +50,7 @@ impl<'a> Cpu<'a> {
             carryf: 0,
 
             wait: 0,
+            interrupts_enabled: true,
         }
     }
 
@@ -67,6 +69,7 @@ impl<'a> Cpu<'a> {
         self.add_subf = 0;
         self.half_carryf = 0;
         self.carryf = 0;
+        self.interrupts_enabled = true;
     }
 
     fn flags(&self) -> u8 {
@@ -84,6 +87,15 @@ impl<'a> Cpu<'a> {
         self.bus.write16(self.sp - 2, self.pc + 1);
         self.sp -= 2;
         self.pc = u16::wrapping_sub(addr, 1);
+        self.wait = 16;
+    }
+
+    fn ret(& mut self){
+        let l = self.bus.read(self.sp);
+        let h = self.bus.read(self.sp + 1);
+        self.sp += 2;
+        self.pc = (h as u16) << 8 | l as u16;
+        self.pc = u16::wrapping_sub(self.pc, 1);
         self.wait = 16;
     }
 
@@ -287,7 +299,7 @@ impl<'a> Cpu<'a> {
             let addr = this.bus.cartridge.read(this.pc+1);
             this.pc = u16::wrapping_add(this.pc, addr as i8 as u16);
             this.wait = 12;
-            this.pc = u16::wrapping_sub(this.pc, 1);
+            this.pc = u16::wrapping_add(this.pc, 1);
             addr
         };
 
@@ -664,7 +676,7 @@ impl<'a> Cpu<'a> {
             }
             0x06 => {
                 self.b = self.bus.cartridge.read(self.pc + 1);
-                disasm!("LD B, d8");
+                disasm!("LD B, d8:{:#x}", self.b);
                 self.wait = 8;
                 self.pc += 1;
             }
@@ -1263,6 +1275,45 @@ impl<'a> Cpu<'a> {
             0xff => {
                 disasm!("RST 0x38");
                 self.call(0x38);
+            }
+            0xc9 => {
+                disasm!("RET");
+                self.ret();
+            }
+            0xd9 => {
+                disasm!("RETI");
+                self.interrupts_enabled = true;
+                self.ret();
+            }
+            0xc8 => {
+                if self.zerof != 0 {
+                    disasm!("RET Z");
+                    self.ret();
+                    self.wait = 20;
+                }else{
+                    disasm!("RET Z <no jmp>");
+                    self.wait = 8;
+                }
+            }
+            0xd8 => {
+                if self.carryf != 0 {
+                    disasm!("RET C");
+                    self.ret();
+                    self.wait = 20;
+                }else{
+                    disasm!("RET C <no jmp>");
+                    self.wait = 8;
+                }
+            }
+            0xF3 => {
+                self.wait = 4;
+                self.interrupts_enabled = false;
+                disasm!("DI");
+            }
+            0xfb => {
+                self.wait = 4;
+                self.interrupts_enabled = true;
+                disasm!("EI");
             }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
