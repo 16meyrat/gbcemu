@@ -80,6 +80,13 @@ impl<'a> Cpu<'a> {
         self.carryf = f & 1 << CARRY;
     }
 
+    fn call(& mut self, addr: u16){
+        self.bus.write16(self.sp - 2, self.pc + 1);
+        self.sp -= 2;
+        self.pc = u16::wrapping_sub(addr, 1);
+        self.wait = 16;
+    }
+
     pub fn tick(&mut self) {
         self.wait -= 1;
         if self.wait > 0 {
@@ -1224,6 +1231,38 @@ impl<'a> Cpu<'a> {
                     let addr = jrel(self);
                     disasm_pc!(pc, "JR NC, {:#x}", addr);
                 }
+            }
+            0xc7 => {
+                disasm!("RST 0x00");
+                self.call(0x00);
+            }
+            0xd7 => {
+                disasm!("RST 0x10");
+                self.call(0x10);
+            }
+            0xe7 => {
+                disasm!("RST 0x20");
+                self.call(0x20);
+            }
+            0xf7 => {
+                disasm!("RST 0x30");
+                self.call(0x30);
+            }
+            0xcf => {
+                disasm!("RST 0x08");
+                self.call(0x08);
+            }
+            0xdf => {
+                disasm!("RST 0x18");
+                self.call(0x18);
+            }
+            0xef => {
+                disasm!("RST 0x28");
+                self.call(0x28);
+            }
+            0xff => {
+                disasm!("RST 0x38");
+                self.call(0x38);
             }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
