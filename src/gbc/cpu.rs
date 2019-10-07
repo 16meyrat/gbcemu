@@ -95,6 +95,15 @@ impl<'a> Cpu<'a> {
             )
         }
 
+        macro_rules! disasm_pc {
+            ($pc: expr, $($arg:tt)+) => (
+                if cfg!(debug_assertions) {
+                    print!("0x{:<8x}: ", $pc);
+                    println!($($arg)+);
+                }
+            )
+        }
+
         macro_rules! inc {
             ($arg:ident) => ({
                 let before = self.$arg;
@@ -258,6 +267,14 @@ impl<'a> Cpu<'a> {
                 disasm!("Cmp A, {}", stringify!($arg));
             });
         }
+
+        fn jump (this: &mut Cpu) -> u16 {
+            let addr = this.bus.cartridge.read16(this.pc + 1);
+            this.pc = addr;
+            this.wait = 16;
+            this.pc = u16::wrapping_sub(this.pc, 1);
+            addr
+        };
 
         let op = self.bus.cartridge.read(self.pc);
         match op {
@@ -1096,6 +1113,61 @@ impl<'a> Cpu<'a> {
                 pop16!(a, f);
                 self.set_flags(flags);
             },
+            0xc3 => {
+                let pc = self.pc;
+                let addr = jump(self);
+                disasm_pc!(pc, "JP {:#x}", addr);
+            },
+            0xc2 => {
+                if self.zerof != 0 {
+                    self.wait = 12;
+                    disasm!("JP NZ, <no_jump>");
+                    self.pc += 2;
+                }else{
+                    let pc = self.pc;
+                    let addr = jump(self);
+                    disasm_pc!(pc, "JP NZ, {:#x}", addr);
+                }
+            }
+            0xd2 => {
+                if self.carryf != 0 {
+                    self.wait = 12;
+                    disasm!("JP NC, <no_jump>");
+                    self.pc += 2;
+                }else{
+                    let pc = self.pc;
+                    let addr = jump(self);
+                    disasm_pc!(pc, "JP NC, {:#x}", addr);
+                }
+            }
+            0xca => {
+                if self.carryf == 0 {
+                    self.wait = 12;
+                    disasm!("JP Z, <no_jump>");
+                    self.pc += 2;
+                }else{
+                    let pc = self.pc;
+                    let addr = jump(self);
+                    disasm_pc!(pc, "JP Z, {:#x}", addr);
+                }
+            }
+            0xda => {
+                if self.carryf == 0 {
+                    self.wait = 12;
+                    disasm!("JP C, <no_jump>");
+                    self.pc += 2;
+                }else{
+                    let pc = self.pc;
+                    let addr = jump(self);
+                    disasm_pc!(pc, "JP C, {:#x}", addr);
+                }
+            }
+            0xe9 => {
+                let hl = ((self.h as u16) << 8) | self.l as u16;
+                disasm!("JP HL:{:#x}", hl);
+                self.wait = 4;
+                self.pc = u16::wrapping_sub(hl, 1);
+            }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
             }

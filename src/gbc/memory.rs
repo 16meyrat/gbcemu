@@ -42,7 +42,6 @@ impl Busable for Ram{
             panic!("Invalid RAM write at {:x}", addr);
         }
     }
-
     fn write16(&mut self, addr: u16, val: u16){
         self.write(addr, (val & 0xff) as u8);
         self.write(addr + 1, (val >> 8) as u8);

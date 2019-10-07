@@ -8,6 +8,7 @@ pub trait Cartridge {
     fn read(&self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, val: u8);
     fn write16(&mut self, addr: u16, value: u16);
+    fn read16(&mut self, addr: u16) -> u16;
 }
 
 pub fn load_rom(path: &str) -> Box<dyn Cartridge> {
@@ -47,6 +48,12 @@ impl Cartridge for NRom {
 
     fn write16(&mut self, addr: u16, value: u16){
 
+    }
+
+    fn read16(&mut self, addr: u16) -> u16{
+        let l = self.read(addr);
+        let h = self.read(addr + 1);
+        ((h as u16) << 8) | l as u16
     }
 }
 
