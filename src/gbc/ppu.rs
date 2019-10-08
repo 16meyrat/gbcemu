@@ -1,4 +1,5 @@
 use super::bus::Busable;
+use num_enum::IntoPrimitive;
 use arrayvec::ArrayVec;
 
 pub struct Ppu {
@@ -9,6 +10,8 @@ pub struct Ppu {
     scy: u8,
     wx: u8, // real_WX - 7
     wy: u8,
+    ly: u8,
+    lcy: u8,
     enabled: bool,
     win_enabled: bool,
     sprite_enabled: bool,
@@ -17,6 +20,13 @@ pub struct Ppu {
     win_map_select: WindowMapSelect,
     win_bg_data: WindowBGTileData,
     bg_map_select: BgMapSelect,
+
+    int_vblank: bool,
+    int_hblank: bool,
+    int_lcy: bool,
+    int_oam: bool,
+
+    current_mode: Mode,
 }
 
 impl Ppu {
@@ -30,6 +40,8 @@ impl Ppu {
             scy: 0,
             wx: 0,
             wy: 0,
+            ly: 0,
+            lcy: 0,
             enabled: false,
             win_enabled: false,
             sprite_enabled: false,
@@ -38,6 +50,13 @@ impl Ppu {
             win_map_select: WindowMapSelect::Low,
             win_bg_data: WindowBGTileData::Low,
             bg_map_select: BgMapSelect::Low,
+
+            int_vblank: false,
+            int_hblank: false,
+            int_lcy: false,
+            int_oam: false,
+
+            current_mode: Mode::VBlank,
         }
     }
 
@@ -83,7 +102,7 @@ impl Ppu {
         self.wy
     }
 
-    pub fn set_wy(&self, val: u8) {
+    pub fn set_wy(&mut self, val: u8) {
         self.wy = val;
     }
 
@@ -91,7 +110,7 @@ impl Ppu {
         self.scy
     }
 
-    pub fn set_scy(&self, val: u8) {
+    pub fn set_scy(&mut self, val: u8) {
         self.scy = val;
     }
 
@@ -99,8 +118,24 @@ impl Ppu {
         self.scx
     }
 
-    pub fn set_scx(&self, val: u8) {
+    pub fn set_scx(&mut self, val: u8) {
         self.scx = val;
+    }
+
+    pub fn get_ly(&self) -> u8 {
+        self.ly
+    }
+
+    pub fn set_ly(&self, _val: u8) {
+        panic!("LY is not writable");
+    }
+
+    pub fn get_lcy(&self) -> u8 {
+        self.lcy
+    }
+
+    pub fn set_lcy(&mut self, val: u8) {
+        self.lcy = val;
     }
 
     pub fn get_lcdc(&self) -> u8 {
@@ -136,6 +171,23 @@ impl Ppu {
         self.sprite_enabled = val & 0x02 != 0;
         self.bg_win_priority = val & 0x01 != 0;
     }
+
+    pub fn get_lcds(&self) -> u8 {
+        let mode: u8 = self.current_mode.into();
+        (self.int_lcy as u8) << 6
+        | (self.int_oam as u8) << 5
+        | (self.int_vblank as u8) << 4
+        | (self.int_hblank as u8) << 3
+        | if self.lcy == self.ly {0x04} else {0}
+        | mode
+    }
+
+    pub fn set_lcds(&mut self, val: u8) {
+        self.int_lcy = val & 0x40 != 0;
+        self.int_oam = val & 0x20 != 0;
+        self.int_vblank = val & 0x10 != 0;
+        self.int_hblank = val & 0x08 != 0;
+    }
 }
 
 impl Busable for Ppu {
@@ -165,6 +217,15 @@ enum BgMapSelect {
 enum ObjSize {
     Small,
     Big
+}
+
+#[derive(Clone, Copy, IntoPrimitive)]
+#[repr(u8)]
+enum Mode {
+    HBlank = 0,
+    VBlank = 1,
+    OamScan = 2,
+    Rendering = 3,
 }
 
 struct Color {

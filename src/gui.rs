@@ -9,7 +9,7 @@ pub const HEIGHT: usize = 144;
 pub const DEPTH: usize = 3;
 pub const SIZE: usize = WIDTH * HEIGHT * DEPTH;
 
-enum GBKey {
+pub enum GBKey {
     Up, Down, Left,Right, A, B, Start, Select
 }
 
