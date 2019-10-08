@@ -8,5 +8,5 @@ edition = "2018"
 
 [dependencies]
 num_enum = "0.4.1"
-
+nannou = "0.11"
 

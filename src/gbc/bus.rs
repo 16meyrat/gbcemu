@@ -23,7 +23,7 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xc000 => self.cartridge.read(addr),
             x if x < 0xe000 => self.ram.read(addr),
             x if x < 0xFE00 => self.ram.read(addr - 0x2000),
-            _ => panic!("Illegal read ad {:#x}", addr)
+            _ => panic!("Illegal read at {:#x}", addr)
         }
     }
 
@@ -34,7 +34,7 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xc000 => self.cartridge.write(addr, value),
             x if x < 0xe000 => self.ram.write(addr, value),
             x if x < 0xFE00 => self.ram.write(addr - 0x2000, value),
-            _ => panic!("Illegal write ad {:#x}", addr)
+            _ => panic!("Illegal write at {:#x}", addr)
         };
     }
     fn write16(&mut self, addr: u16, value: u16){
@@ -44,7 +44,7 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xc000 => self.cartridge.write16(addr, value),
             x if x < 0xe000 => self.ram.write16(addr, value),
             x if x < 0xFE00 => self.ram.write16(addr - 0x2000, value),
-            _ => panic!("Illegal write16 ad {:#x}", addr)
+            _ => panic!("Illegal write16 at {:#x}", addr)
         };
     }
 }
