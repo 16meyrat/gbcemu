@@ -1,6 +1,4 @@
-
-use super::bus::Bus;
-use super::bus::Busable;
+use super::bus::*;
 
 pub struct Cpu<'a> {
     bus: &'a mut Bus<'a>,
@@ -69,7 +67,7 @@ impl<'a> Cpu<'a> {
         self.add_subf = 0;
         self.half_carryf = 0;
         self.carryf = 0;
-        self.interrupts_enabled = true;
+        self.interrupts_enabled = false;
     }
 
     fn flags(&self) -> u8 {
@@ -102,6 +100,25 @@ impl<'a> Cpu<'a> {
     pub fn tick(&mut self) {
         self.wait -= 1;
         if self.wait > 0 {
+            return;
+        }
+
+        if self.interrupts_enabled && (self.bus.enabled_interrupts & self.bus.requested_interrupts != 0){
+            let active_interrupts = self.bus.enabled_interrupts & self.bus.requested_interrupts;
+            self.sp -= 2;
+            self.bus.write16(self.sp, self.pc);
+            self.wait = 20;
+            if active_interrupts & VBLANK != 0 {
+                self.pc = 0x40;
+            } else if active_interrupts & LCD_STAT != 0{
+                self.pc = 0x48;
+            } else if active_interrupts & TIMER != 0{
+                self.pc = 0x50;
+            } else if active_interrupts & SERIAL != 0 {
+                self.pc = 0x58;
+            } else if active_interrupts & JOYPAD != 0 {
+                self.pc = 0x60;
+            }
             return;
         }
 
@@ -746,7 +763,7 @@ impl<'a> Cpu<'a> {
             }
             0x3e => {
                 self.a = self.bus.cartridge.read(self.pc + 1);
-                disasm!("LD A, d8");
+                disasm!("LD A, d8:{:#x}", self.a);
                 self.wait = 8;
                 self.pc += 1;
             }
@@ -761,7 +778,7 @@ impl<'a> Cpu<'a> {
             0xe0 => {
                 let a8 = self.bus.cartridge.read(self.pc + 1);
                 self.bus.write( a8 as u16 | 0xFF00, self.a);
-                disasm!("LDH (a8), A");
+                disasm!("LDH (a8):0xff{:02x}, A", a8);
                 self.wait = 12;
                 self.pc += 1;
             }

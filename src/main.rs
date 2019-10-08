@@ -12,6 +12,7 @@ use std::sync::{mpsc, Arc, Mutex};
 
 extern crate num_enum;
 extern crate sdl2;
+extern crate arrayvec;
 
 fn main() {
     let (tx, rx) = mpsc::channel::<gui::Message>();
@@ -34,7 +35,7 @@ fn run_emulator(rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui:
     {
         let mut tex = texture.lock().expect("Mutex error");
         for (i, byte) in tex.iter_mut().enumerate() {
-            if i % 3 == 0 {
+            if i % 3 == 1 {
                 *byte = 255;
             }
         }
