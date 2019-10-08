@@ -30,7 +30,7 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xc000 => self.cartridge.read(addr),
             x if x < 0xe000 => self.ram.read(addr),
             x if x < 0xFE00 => self.ram.read(addr - 0x2000),
-            x if x < 0xFEA0 => self.ram.read(addr - 0x2000),
+            x if x >= 0xff80 && x < 0xfffe => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
             0xff0f => self.requested_interrupts,
             0xff40 => self.ppu.get_lcdc(),
@@ -44,6 +44,11 @@ impl<'a> Busable for Bus<'a> {
             0xff47 => self.ppu.get_bgp(),
             0xff48 => self.ppu.get_obp0(),
             0xff49 => self.ppu.get_obp1(),
+            0xff01 => 0, // serial
+            0xff02 => 0, // serial
+            x if x >= 0xff10 && x < 0xff27 => 0, // sound
+            x if x >= 0xff30 && x < 0xff40 => 0, // sound
+
             _ => panic!("Illegal read at {:#x}", addr)
         }
     }
@@ -55,8 +60,24 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xc000 => self.cartridge.write(addr, value),
             x if x < 0xe000 => self.ram.write(addr, value),
             x if x < 0xFE00 => self.ram.write(addr - 0x2000, value),
+            x if x >= 0xff80 && x < 0xfffe => self.ram.write(addr, value),
             0xffff => self.enabled_interrupts = value,
             0xff0f => self.requested_interrupts = value,
+            0xff40 => self.ppu.set_lcdc(value),
+            0xff41 => self.ppu.set_lcds(value),
+            0xff42 => self.ppu.set_scy(value),
+            0xff43 => self.ppu.set_scx(value),
+            0xff44 => self.ppu.set_ly(value),
+            0xff45 => self.ppu.set_lcy(value),
+            0xff4a => self.ppu.set_wy(value),
+            0xff4b => self.ppu.set_wx(value),
+            0xff47 => self.ppu.set_bgp(value),
+            0xff48 => self.ppu.set_obp0(value),
+            0xff49 => self.ppu.set_obp1(value),
+            0xff01 => {}, // serial
+            0xff02 => {}, // serial
+            x if x >= 0xff10 && x < 0xff27 => {}, // sound
+            x if x >= 0xff30 && x < 0xff40 => {}, // sound
             _ => panic!("Illegal write at {:#x}", addr)
         };
     }
