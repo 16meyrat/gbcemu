@@ -2,10 +2,16 @@ mod gbc;
 mod gui;
 
 use gbc::bus::Bus;
+use gbc::bus;
+
 use gbc::cpu::Cpu;
+use gbc::ppu::{PpuInterrupt};
 use gbc::cartridge::load_rom;
 
 use gui::{Message, Gui};
+
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use std::thread;
 use std::sync::{mpsc, Arc, Mutex};
@@ -28,7 +34,7 @@ fn main() {
 fn run_emulator(rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui::SIZE]>>) {
     let mut rom = load_rom("Tetris.GB");
     let mut bus = Bus::new(&mut *rom);
-    let mut cpu = Cpu::new(& mut bus);
+    let mut cpu = Cpu::new();
 
     cpu.reset();
 
@@ -42,7 +48,13 @@ fn run_emulator(rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui:
     }
     
     loop {
-        cpu.tick();
+        cpu.tick(&mut bus);
+
+        match bus.ppu.tick() {
+            PpuInterrupt::None => {},
+            PpuInterrupt::VBlank => bus.requested_interrupts |= bus::VBLANK,
+            PpuInterrupt::Stat => bus.requested_interrupts |= bus::LCD_STAT,
+        };
 
         match rx.try_recv() {
             Ok(event) => {

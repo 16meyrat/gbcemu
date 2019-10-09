@@ -4,7 +4,7 @@ use super::memory::Ram;
 use super::cartridge::Cartridge;
 
 pub struct Bus<'a>{
-    ppu: Ppu,
+    pub ppu: Ppu,
     ram: Ram,
     pub cartridge: &'a mut dyn Cartridge,
     pub enabled_interrupts: u8,

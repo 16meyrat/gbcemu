@@ -3,5 +3,5 @@ pub mod cartridge;
 pub mod bus;
 pub mod cpu;
 
-mod ppu;
+pub mod ppu;
 mod memory;

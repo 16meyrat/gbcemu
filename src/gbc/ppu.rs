@@ -27,6 +27,17 @@ pub struct Ppu {
     int_oam: bool,
 
     current_mode: Mode,
+
+    vram: [u8; 0x2000],
+    oam: [u8; 0x2A],
+
+    wait: usize,
+}
+
+pub enum PpuInterrupt {
+    None,
+    VBlank,
+    Stat,
 }
 
 impl Ppu {
@@ -57,6 +68,11 @@ impl Ppu {
             int_oam: false,
 
             current_mode: Mode::VBlank,
+
+            vram: [0; 0x2000],
+            oam: [0; 0x2A],
+
+            wait: 0,
         }
     }
 
@@ -188,14 +204,74 @@ impl Ppu {
         self.int_vblank = val & 0x10 != 0;
         self.int_hblank = val & 0x08 != 0;
     }
+
+    pub fn tick(&mut self) -> PpuInterrupt {
+        if self.wait != 0 {
+            self.wait -= 1;
+            return PpuInterrupt::None;
+        }
+
+        let mut res = PpuInterrupt::None;
+
+        match self.current_mode {
+            Mode::OamScan => {
+                self.wait = 200;
+                self.current_mode = Mode::Rendering;
+            }
+            Mode::Rendering => {
+                self.wait = 100;
+                self.current_mode = Mode::HBlank;
+                if self.int_hblank {
+                    res = PpuInterrupt::Stat;
+                }
+            }
+            Mode::HBlank => {
+                self.ly += 1;
+                if self.ly == self.lcy && self.int_lcy {
+                    res = PpuInterrupt::Stat;
+                }
+                if self.ly >= 144 {
+                    self.wait = 4560;
+                    self.current_mode = Mode::VBlank;
+                    if self.int_vblank {
+                        res = PpuInterrupt::VBlank;
+                    }
+                } else {
+                    self.wait = 80;
+                    self.current_mode = Mode::OamScan;
+                }
+            }
+            Mode::VBlank => {
+                self.ly = 0;
+                self.wait = 80;
+                self.current_mode = Mode::OamScan;
+                if self.int_oam {
+                    res = PpuInterrupt::Stat;
+                }
+            }
+        }
+        res
+    }
 }
 
 impl Busable for Ppu {
     fn read(&self, addr: u16) -> u8{
-        0
+        if addr < 0xA000 {
+            self.vram[(addr - 0x8000) as usize]
+        } else if addr < 0xfea0 {
+            self.oam[(addr - 0xfe00) as usize]
+        } else {
+            panic!("Illegal VRam read : {:#x}", addr)
+        }
     }
     fn write(&mut self, addr: u16, val: u8){
-
+        if addr < 0xA000 {
+            self.vram[(addr - 0x8000) as usize] = val;
+        } else if addr < 0xfea0 {
+            self.oam[(addr - 0xfe00) as usize] = val;
+        } else {
+            panic!("Illegal VRam write : {:#x}", addr)
+        }
     }
 }
 
