@@ -105,7 +105,6 @@ impl Cpu {
             bus.write16(self.sp, self.pc);
             self.wait = 20;
             if active_interrupts & VBLANK != 0 {
-                eprintln!("VBLANK");
                 self.pc = 0x40;
             } else if active_interrupts & LCD_STAT != 0{
                 self.pc = 0x48;
@@ -1305,6 +1304,61 @@ impl Cpu {
             0xff => {
                 disasm!("RST 0x38");
                 self.call(bus, 0x38);
+            }
+            0xcd => {
+                let addr = bus.cartridge.read16(self.pc + 1);
+                self.pc += 2;
+                self.call(bus, addr);
+                self.wait = 24;
+                disasm!("CALL {:#x}", addr);
+            }
+            0xc4 => {
+                let addr = bus.cartridge.read16(self.pc + 1);
+                self.pc += 2;
+                if self.zerof == 0 {
+                    self.call(bus, addr);
+                    self.wait = 24;
+                    disasm!("CALL NZ, {:#x}", addr);
+                }else{
+                    self.wait = 12;
+                    disasm!("CALL NZ, <no_jump>");
+                }
+            }
+            0xd4 => {
+                let addr = bus.cartridge.read16(self.pc + 1);
+                self.pc += 2;
+                if self.carryf == 0 {
+                    self.call(bus, addr);
+                    self.wait = 24;
+                    disasm!("CALL NC, {:#x}", addr);
+                }else{
+                    self.wait = 12;
+                    disasm!("CALL NC, <no_jump>");
+                }
+            }
+            0xcc => {
+                let addr = bus.cartridge.read16(self.pc + 1);
+                self.pc += 2;
+                if self.zerof != 0 {
+                    self.call(bus, addr);
+                    self.wait = 24;
+                    disasm!("CALL Z, {:#x}", addr);
+                }else{
+                    self.wait = 12;
+                    disasm!("CALL Z, <no_jump>");
+                }
+            }
+            0xdc => {
+                let addr = bus.cartridge.read16(self.pc + 1);
+                self.pc += 2;
+                if self.carryf != 0 {
+                    self.call(bus, addr);
+                    self.wait = 24;
+                    disasm!("CALL C, {:#x}", addr);
+                }else{
+                    self.wait = 12;
+                    disasm!("CALL C, <no_jump>");
+                }
             }
             0xc9 => {
                 disasm!("RET");

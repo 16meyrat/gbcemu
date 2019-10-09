@@ -46,6 +46,7 @@ impl<'a> Busable for Bus<'a> {
             0xff47 => self.ppu.get_bgp(),
             0xff48 => self.ppu.get_obp0(),
             0xff49 => self.ppu.get_obp1(),
+            0xff7f => 0, //empty
             0xff01 => 0, // serial
             0xff02 => 0, // serial
             x if x >= 0xff10 && x < 0xff27 => 0, // sound
@@ -78,6 +79,7 @@ impl<'a> Busable for Bus<'a> {
             0xff47 => self.ppu.set_bgp(value),
             0xff48 => self.ppu.set_obp0(value),
             0xff49 => self.ppu.set_obp1(value),
+            0xff7f => {}, //empty
             0xff01 => {}, // serial
             0xff02 => {}, // serial
             x if x >= 0xff10 && x < 0xff27 => {}, // sound
