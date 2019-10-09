@@ -29,7 +29,7 @@ pub struct Ppu {
     current_mode: Mode,
 
     vram: [u8; 0x2000],
-    oam: [u8; 0x2A],
+    oam: [u8; 0xA0],
 
     wait: usize,
 }
@@ -70,7 +70,7 @@ impl Ppu {
             current_mode: Mode::VBlank,
 
             vram: [0; 0x2000],
-            oam: [0; 0x2A],
+            oam: [0; 0xA0],
 
             wait: 0,
         }

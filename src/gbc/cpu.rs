@@ -36,7 +36,7 @@ impl Cpu {
             h: 0,
             l: 0,
             pc: 0,
-            sp: 0xfff4,
+            sp: 0xfffe,
             
             zerof: 0,
             add_subf: 0,
@@ -105,6 +105,7 @@ impl Cpu {
             bus.write16(self.sp, self.pc);
             self.wait = 20;
             if active_interrupts & VBLANK != 0 {
+                eprintln!("VBLANK");
                 self.pc = 0x40;
             } else if active_interrupts & LCD_STAT != 0{
                 self.pc = 0x48;
@@ -817,11 +818,13 @@ impl Cpu {
             0xea => {
                 let addr = bus.cartridge.read16(self.pc + 1);
                 bus.cartridge.write(addr, self.a);
+                self.pc += 2;
                 disasm!("LD ({:#x}), A", addr);
             }
             0xfa => {
                 let addr = bus.cartridge.read16(self.pc + 1);
                 self.a = bus.cartridge.read(addr);
+                self.pc += 2;
                 disasm!("LD A, ({:#x})", addr);
             }
             0x04 => inc!(b),
