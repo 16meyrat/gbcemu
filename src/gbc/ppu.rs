@@ -231,7 +231,7 @@ impl Ppu {
                     res = PpuInterrupt::Stat;
                 }
                 if self.ly >= 144 {
-                    self.wait = 4560;
+                    self.wait = 456;
                     self.current_mode = Mode::VBlank;
                     if self.int_vblank {
                         res = PpuInterrupt::VBlank;
@@ -242,11 +242,16 @@ impl Ppu {
                 }
             }
             Mode::VBlank => {
-                self.ly = 0;
-                self.wait = 80;
-                self.current_mode = Mode::OamScan;
-                if self.int_oam {
-                    res = PpuInterrupt::Stat;
+                if self.ly < 154 {
+                    self.wait = 456;
+                    self.ly += 1;
+                } else {
+                    self.ly = 0;
+                    self.wait = 80;
+                    self.current_mode = Mode::OamScan;
+                    if self.int_oam {
+                        res = PpuInterrupt::Stat;
+                    }
                 }
             }
         }
