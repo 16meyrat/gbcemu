@@ -175,7 +175,7 @@ impl Cpu {
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 4;
-                disasm!("Add a, {}", stringify!($arg));
+                disasm!("Add a, {}={:#x}", stringify!($arg), self.$arg);
             });
         }
 
@@ -189,7 +189,7 @@ impl Cpu {
                 self.h = (res >> 8) as u8;
                 self.l = res as u8;
                 self.wait = 8;
-                disasm!("Add HL, {}:{:#x}", stringify!($arg), $arg);
+                disasm!("Add HL:{:#x}, {}:{:#x} => {:#x}", hl, stringify!($arg), $arg, res);
             });
         }
 
@@ -209,7 +209,7 @@ impl Cpu {
                 *$h = bus.read(self.sp);
                 self.sp += 1;
                 self.wait = 12;
-                disasm!("POP {}{}", stringify!($h), stringify!($l));
+                disasm!("POP {}{}:0x{:x}{:x}", stringify!($h), stringify!($l), $h, $l);
             };
         }
 
@@ -452,7 +452,7 @@ impl Cpu {
             0x56 => {
                 self.d = bus.read((self.h as u16) << 8 | self.l as u16);
                 self.wait = 8;
-                disasm!("LD D, (HL)");
+                disasm!("LD D, (HL):{:#x}", self.d);
             }
             0x66 => {
                 self.h = bus.read((self.h as u16) << 8 | self.l as u16);
@@ -602,7 +602,7 @@ impl Cpu {
             0x5e => {
                 self.e = bus.read((self.h as u16) << 8 | self.l as u16);
                 self.wait = 8;
-                disasm!("LD E, (HL)");
+                disasm!("LD E, (HL):{:#x}", self.e);
             }
             0x6e => {
                 self.l = bus.read((self.h as u16) << 8 | self.l as u16);
@@ -884,7 +884,7 @@ impl Cpu {
                 self.wait = 8;
             }
             0x23 => {
-                let mut hl = (self.h as u16) << 8 | self.b as u16;
+                let mut hl = (self.h as u16) << 8 | self.l as u16;
                 hl = u16::wrapping_add(hl, 1);
                 self.l = (hl & 0xff) as u8;
                 self.h = (hl >> 8) as u8;
