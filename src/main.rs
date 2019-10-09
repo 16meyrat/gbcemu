@@ -10,9 +10,6 @@ use gbc::cartridge::load_rom;
 
 use gui::{Message, Gui};
 
-use std::rc::Rc;
-use std::cell::RefCell;
-
 use std::thread;
 use std::sync::{mpsc, Arc, Mutex};
 

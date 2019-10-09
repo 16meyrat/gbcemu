@@ -189,7 +189,7 @@ impl Cpu {
                 self.h = (res >> 8) as u8;
                 self.l = res as u8;
                 self.wait = 8;
-                disasm!("Add HL, {}", $arg);
+                disasm!("Add HL, {}:{:#x}", stringify!($arg), $arg);
             });
         }
 
@@ -1100,22 +1100,25 @@ impl Cpu {
             0xe6 => {
                 let arg8 = bus.read(self.pc +1 );
                 andA!(arg8);
+                self.pc += 1;
                 self.wait = 8;
             },
             0xf6 => {
                 let arg8 = bus.read(self.pc +1 );
                 orA!(arg8);
+                self.pc += 1;
                 self.wait = 8;
             },
             0xee => {
                 let arg8 = bus.read(self.pc +1 );
                 xorA!(arg8);
+                self.pc += 1;
                 self.wait = 8;
             },
             0xfe => {
                 let arg8 = bus.read(self.pc +1 );
-                self.pc += 1;
                 cmpA!(arg8);
+                self.pc += 1;
                 self.wait = 8;
             },
             0x09 => {

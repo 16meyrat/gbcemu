@@ -7,8 +7,6 @@ use std::convert::TryFrom;
 pub trait Cartridge {
     fn read(&self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, val: u8);
-    fn write16(&mut self, addr: u16, value: u16);
-    fn read16(&mut self, addr: u16) -> u16;
 }
 
 pub fn load_rom(path: &str) -> Box<dyn Cartridge> {
@@ -16,6 +14,11 @@ pub fn load_rom(path: &str) -> Box<dyn Cartridge> {
     println!("Loading {} ...", path);
     let title = rom.get_title();
     println!("Title: {}", title);
+
+    let gbc = rom.is_gbc();
+    println!("Game Boy Color mode: {}", gbc);
+
+    println!("External RAM size : {:#x}", rom.get_ram_size());
 
     let mbc_type = rom.get_mbc_type();
     let res = match mbc_type {
@@ -33,27 +36,22 @@ pub fn load_rom(path: &str) -> Box<dyn Cartridge> {
 
 struct NRom {
     banks: [u8; 0x8000],
+    ram: Vec<u8>,
 }
 
 impl Cartridge for NRom {
     fn read(&self, addr: u16) -> u8{
         match addr {
             x if x < 0x8000 => self.banks[addr as usize],
+            x if x >= 0xa000 && x < 0xc000 => self.ram[addr as usize - 0xa000],
             _ => panic!("Illegal cartridge read at {:#x}", addr),
         }
     }
     fn write(&mut self, addr: u16, val: u8){
-
-    }
-
-    fn write16(&mut self, addr: u16, value: u16){
-
-    }
-
-    fn read16(&mut self, addr: u16) -> u16{
-        let l = self.read(addr);
-        let h = self.read(addr + 1);
-        ((h as u16) << 8) | l as u16
+        match addr {
+            x if x >= 0xa000 && x < 0xc000 => self.ram[addr as usize - 0xa000] = val,
+            _ => {}, // usually select MBC, but noop for NRom
+        };
     }
 }
 
@@ -61,8 +59,10 @@ impl NRom {
     pub fn new(rom: & mut Rom) -> Self {
         let rom_data = rom.read_range(0, 0x8000);
         let slice = &rom_data[..0x8000];
+        let ram_size = rom.get_ram_size();
         let mut res = NRom{
             banks: [0; 0x8000],
+            ram: vec![0; ram_size],
         };
         res.banks.copy_from_slice(slice);
         res
@@ -110,6 +110,22 @@ impl Rom {
         let mut s = str::from_utf8(&str_arr).expect("Invalid UTF-8 in game title");
         s = s.trim_matches(char::from(0));
         s.to_owned()
+    }
+
+    fn is_gbc(&self) -> bool {
+        self.data[0x143] & 0x80 != 0
+    }
+
+    fn get_ram_size(&self) -> usize {
+        match self.data[0x149] {
+            0 => 0,
+            1 => 0x800,
+            2 => 0x2000,
+            3 => 0x8000,
+            4 => 0x20000,
+            5 => 0x10000,
+            x => panic!("Invalid RAM size: {}", x)
+        }
     }
 
     fn get_mbc_type(&mut self) -> MbcType {
