@@ -106,14 +106,19 @@ impl Cpu {
             self.wait = 20;
             if active_interrupts & VBLANK != 0 {
                 self.pc = 0x40;
+                bus.requested_interrupts &= !VBLANK;
             } else if active_interrupts & LCD_STAT != 0{
                 self.pc = 0x48;
+                bus.requested_interrupts &= !LCD_STAT;
             } else if active_interrupts & TIMER != 0{
                 self.pc = 0x50;
+                bus.requested_interrupts &= !TIMER;
             } else if active_interrupts & SERIAL != 0 {
                 self.pc = 0x58;
+                bus.requested_interrupts &= !SERIAL;
             } else if active_interrupts & JOYPAD != 0 {
                 self.pc = 0x60;
+                bus.requested_interrupts &= !JOYPAD;
             }
             return;
         }
@@ -822,7 +827,7 @@ impl Cpu {
             }
             0xfa => {
                 let addr = bus.cartridge.read16(self.pc + 1);
-                self.a = bus.cartridge.read(addr);
+                self.a = bus.read(addr);
                 self.pc += 2;
                 disasm!("LD A, ({:#x})", addr);
             }
@@ -1307,57 +1312,57 @@ impl Cpu {
             }
             0xcd => {
                 let addr = bus.cartridge.read16(self.pc + 1);
+                disasm!("CALL {:#x}", addr);
                 self.pc += 2;
                 self.call(bus, addr);
                 self.wait = 24;
-                disasm!("CALL {:#x}", addr);
             }
             0xc4 => {
                 let addr = bus.cartridge.read16(self.pc + 1);
-                self.pc += 2;
                 if self.zerof == 0 {
-                    self.call(bus, addr);
-                    self.wait = 24;
                     disasm!("CALL NZ, {:#x}", addr);
+                    self.call(bus, addr);
                 }else{
                     self.wait = 12;
                     disasm!("CALL NZ, <no_jump>");
+                    self.pc += 2;
                 }
             }
             0xd4 => {
                 let addr = bus.cartridge.read16(self.pc + 1);
-                self.pc += 2;
                 if self.carryf == 0 {
+                    disasm!("CALL NC, {:#x}", addr);
                     self.call(bus, addr);
                     self.wait = 24;
-                    disasm!("CALL NC, {:#x}", addr);
                 }else{
                     self.wait = 12;
                     disasm!("CALL NC, <no_jump>");
+                    self.pc += 2;
                 }
             }
             0xcc => {
                 let addr = bus.cartridge.read16(self.pc + 1);
-                self.pc += 2;
                 if self.zerof != 0 {
+                    disasm!("CALL Z, {:#x}", addr);
                     self.call(bus, addr);
                     self.wait = 24;
-                    disasm!("CALL Z, {:#x}", addr);
                 }else{
                     self.wait = 12;
                     disasm!("CALL Z, <no_jump>");
+                    self.pc += 2;
                 }
             }
             0xdc => {
                 let addr = bus.cartridge.read16(self.pc + 1);
                 self.pc += 2;
                 if self.carryf != 0 {
+                    disasm!("CALL C, {:#x}", addr);
                     self.call(bus, addr);
                     self.wait = 24;
-                    disasm!("CALL C, {:#x}", addr);
                 }else{
                     self.wait = 12;
                     disasm!("CALL C, <no_jump>");
+                    self.pc += 2;
                 }
             }
             0xc9 => {
@@ -1380,6 +1385,26 @@ impl Cpu {
                 }
             }
             0xd8 => {
+                if self.carryf == 0 {
+                    disasm!("RET NC");
+                    self.ret(bus);
+                    self.wait = 20;
+                }else{
+                    disasm!("RET NC <no jmp>");
+                    self.wait = 8;
+                }
+            }
+            0xc0 => {
+                if self.zerof == 0 {
+                    disasm!("RET NZ");
+                    self.ret(bus);
+                    self.wait = 20;
+                }else{
+                    disasm!("RET NZ <no jmp>");
+                    self.wait = 8;
+                }
+            }
+            0xd0 => {
                 if self.carryf != 0 {
                     disasm!("RET C");
                     self.ret(bus);
