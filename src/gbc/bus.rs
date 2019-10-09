@@ -104,4 +104,10 @@ impl<'a> Bus<'a> {
         self.write(addr, (value & 0xff) as u8);
         self.write(addr + 1, (value >> 8) as u8);
     }
+
+    pub fn read16(&mut self, addr: u16) -> u16{
+        let l = self.read(addr);
+        let h = self.read(addr + 1);
+        ((h as u16) << 8) | l as u16
+    }
 }
