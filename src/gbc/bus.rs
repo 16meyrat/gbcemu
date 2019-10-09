@@ -34,6 +34,8 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xfeff => 0,
             x if x >= 0xff80 && x <= 0xfffe => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
+            0xff00 => 0, // joypad
+            0xff06 => 0, // timer
             0xff0f => self.requested_interrupts,
             0xff40 => self.ppu.get_lcdc(),
             0xff41 => self.ppu.get_lcds(),
@@ -43,6 +45,7 @@ impl<'a> Busable for Bus<'a> {
             0xff45 => self.ppu.get_lcy(),
             0xff4a => self.ppu.get_wy(),
             0xff4b => self.ppu.get_wx(),
+            0xff46 => 0, // dma
             0xff47 => self.ppu.get_bgp(),
             0xff48 => self.ppu.get_obp0(),
             0xff49 => self.ppu.get_obp1(),
@@ -67,6 +70,8 @@ impl<'a> Busable for Bus<'a> {
             x if x <= 0xfeff => {},
             x if x >= 0xff80 && x <= 0xfffe => self.ram.write(addr, value),
             0xffff => self.enabled_interrupts = value,
+            0xff00 => {}, // joypad
+            0xff06 => {}, // timer modulo
             0xff0f => self.requested_interrupts = value,
             0xff40 => self.ppu.set_lcdc(value),
             0xff41 => self.ppu.set_lcds(value),
@@ -76,6 +81,7 @@ impl<'a> Busable for Bus<'a> {
             0xff45 => self.ppu.set_lcy(value),
             0xff4a => self.ppu.set_wy(value),
             0xff4b => self.ppu.set_wx(value),
+            0xff46 => self.dma(value), // dma
             0xff47 => self.ppu.set_bgp(value),
             0xff48 => self.ppu.set_obp0(value),
             0xff49 => self.ppu.set_obp1(value),
@@ -109,5 +115,12 @@ impl<'a> Bus<'a> {
         let l = self.read(addr);
         let h = self.read(addr + 1);
         ((h as u16) << 8) | l as u16
+    }
+
+    fn dma(&mut self, val: u8) {
+        for addr in 0..0x9f {
+            let byte = self.read((val as u16) << 8 | addr);
+            self.write(0xfe00 | addr, byte);
+        }
     }
 }
