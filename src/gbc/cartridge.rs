@@ -49,7 +49,12 @@ impl Cartridge for NRom {
     }
     fn write(&mut self, addr: u16, val: u8){
         match addr {
-            x if x >= 0xa000 && x < 0xc000 => self.ram[addr as usize - 0xa000] = val,
+            x if x >= 0xa000 && x < 0xa000  => {
+                let index = addr as usize - 0xa000;
+                if index < self.ram.len() {
+                    self.ram[index] = val;
+                }
+            }
             _ => {}, // usually select MBC, but noop for NRom
         };
     }
