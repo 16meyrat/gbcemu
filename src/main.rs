@@ -30,19 +30,10 @@ fn main() {
 
 fn run_emulator(rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui::SIZE]>>) {
     let mut rom = load_rom("Tetris.GB");
-    let mut bus = Bus::new(&mut *rom);
+    let mut bus = Bus::new(&mut *rom, texture);
     let mut cpu = Cpu::new();
 
     cpu.reset();
-
-    {
-        let mut tex = texture.lock().expect("Mutex error");
-        for (i, byte) in tex.iter_mut().enumerate() {
-            if i % 3 == 1 {
-                *byte = 255;
-            }
-        }
-    }
     
     loop {
         cpu.tick(&mut bus);

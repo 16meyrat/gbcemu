@@ -3,6 +3,11 @@ use super::ppu::Ppu;
 use super::memory::Ram;
 use super::cartridge::Cartridge;
 
+use std::sync::Arc;
+use std::sync::Mutex;
+
+use crate::gui;
+
 pub struct Bus<'a>{
     pub ppu: Ppu,
     ram: Ram,
@@ -100,9 +105,9 @@ impl<'a> Busable for Bus<'a> {
 }
 
 impl<'a> Bus<'a> {
-    pub fn new(cartridge: &'a mut dyn Cartridge) -> Bus<'a> {
+    pub fn new(cartridge: &'a mut dyn Cartridge, rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>) -> Bus<'a> {
         Bus {
-            ppu: Ppu::new(),
+            ppu: Ppu::new(rendering_texure),
             ram: Ram::new(),
             cartridge: cartridge,
             enabled_interrupts: 0xFF,

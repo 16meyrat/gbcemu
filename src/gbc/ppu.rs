@@ -2,6 +2,14 @@ use super::bus::Busable;
 use num_enum::IntoPrimitive;
 use arrayvec::ArrayVec;
 
+use std::sync::Arc;
+use std::sync::Mutex;
+
+use std::time::{Instant, Duration};
+use std::thread::sleep;
+
+use crate::gui;
+
 pub struct Ppu {
     background_palette: ArrayVec<[Color; 4]>,
     obj_palette0: ArrayVec<[Color; 4]>,
@@ -32,6 +40,10 @@ pub struct Ppu {
     oam: [u8; 0xA0],
 
     wait: usize,
+    last_time: Instant,
+
+    rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>,
+    texture: Vec<[Color; gui::WIDTH]>,
 }
 
 pub enum PpuInterrupt {
@@ -41,7 +53,7 @@ pub enum PpuInterrupt {
 }
 
 impl Ppu {
-    pub fn new() -> Self {
+    pub fn new(rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>) -> Self {
         
         Ppu{
             background_palette: (0..3).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
@@ -73,6 +85,10 @@ impl Ppu {
             oam: [0; 0xA0],
 
             wait: 0,
+            last_time: Instant::now(),
+
+            rendering_texure,
+            texture: vec![[Color::new(0, 0, 0); gui::WIDTH]; gui::HEIGHT],
         }
     }
 
@@ -219,6 +235,7 @@ impl Ppu {
                 self.current_mode = Mode::Rendering;
             }
             Mode::Rendering => {
+                self.render_line();
                 self.wait = 100;
                 self.current_mode = Mode::HBlank;
                 if self.int_hblank {
@@ -231,6 +248,7 @@ impl Ppu {
                     res = PpuInterrupt::Stat;
                 }
                 if self.ly >= 144 {
+                    self.render();
                     self.wait = 456;
                     self.current_mode = Mode::VBlank;
                     if self.int_vblank {
@@ -257,6 +275,81 @@ impl Ppu {
         }
         res
     }
+
+    fn render_line(&mut self) {
+        self.render_background();
+
+        let last_time = self.last_time;
+        self.last_time = Instant::now();
+        let elapsed = self.last_time.duration_since(last_time).as_micros();
+        if elapsed < (16_666 - 1_000) {
+            sleep(Duration::from_micros(16_666 - elapsed as u64));
+        } else {
+            std::thread::yield_now();
+        }
+    }
+
+    fn render_background(&mut self) {
+        let get_tile = if let WindowBGTileData::Low = self.win_bg_data {
+            Ppu::get_tile_line_signed
+        } else {
+            Ppu::get_tile_line_unsigned
+        };
+        let y = u8::wrapping_add(self.ly, self.scy);
+        let mut x = 0;
+        while x < gui::WIDTH {
+            let rel_x = x + self.scx as usize;
+            let tile_index = self.vram[self.bg_map_select as usize + y as usize * 8 + rel_x / 8];
+            let tile_data = get_tile(&self, tile_index, y as usize);
+            let offset_x = rel_x % 8;
+            for tile_x in offset_x..8 {
+                self.texture[self.ly as usize][x + (8 - tile_x)] = self.background_palette[tile_data[tile_x as usize] as usize];
+            }
+            x += offset_x;
+        }
+    }
+
+    fn render_window(&mut self) {
+        
+    }
+
+    fn get_tile_line_signed(&self, nb: u8 , y: usize) -> [u8; 8] {
+        let addr = (0x1000 + nb as i8 as isize * 16 ) + y as isize % 8 * 2;
+        let l = self.vram[addr as usize];
+        let h = self.vram[addr as usize + 1];
+        let mut res = [0u8; 8];
+        for i in 0..8 {
+            res[i] = ((h >> 7-i & 1u8) << 1) | ((l >> 7-i & 1u8));
+        }
+        res
+    }
+
+    fn get_tile_line_unsigned(&self, nb: u8 , y: usize) -> [u8; 8] {
+        let addr = nb as usize * 16 + y % 8 * 2;
+        let l = self.vram[addr];
+        let h = self.vram[addr + 1];
+        let mut res = [0u8; 8];
+        for i in 0..8 {
+            res[i] = ((h & 1u8 << 8-i) >> 7-i) | ((l & 1u8 << 8-i) >> 8-i)
+        }
+        res
+    }
+
+    fn render(&mut self) {
+        let mut target = self.rendering_texure.lock().unwrap();
+        let mut index = 0;
+        for y in 0..gui::HEIGHT {
+            for x in 0..gui::WIDTH {
+                unsafe {
+                    let color = self.texture.get_unchecked(y).get_unchecked(x);
+                    *target.get_unchecked_mut(index) = color.r;
+                    *target.get_unchecked_mut(index + 1) = color.g;
+                    *target.get_unchecked_mut(index + 2) = color.b;
+                    index += 3;
+                }
+            }
+        }
+    }
 }
 
 impl Busable for Ppu {
@@ -280,19 +373,25 @@ impl Busable for Ppu {
     }
 }
 
+#[derive(Clone, Copy, IntoPrimitive)]
+#[repr(u16)]
 enum WindowMapSelect {
-    Low = 0x9800,
-    High = 0x9C00,
+    Low = 0x1800,
+    High = 0x1C00,
 }
 
+#[derive(Clone, Copy, IntoPrimitive)]
+#[repr(u16)]
 enum WindowBGTileData {
-    Low = 0x8800,
-    High = 0x8000,
+    Low = 0x0800,
+    High = 0x0000,
 }
 
+#[derive(Clone, Copy, IntoPrimitive)]
+#[repr(u16)]
 enum BgMapSelect {
-    Low = 0x9800,
-    High = 0x9C00,
+    Low = 0x1800,
+    High = 0x1C00,
 }
 
 enum ObjSize {
@@ -309,6 +408,7 @@ enum Mode {
     Rendering = 3,
 }
 
+#[derive(Clone, Copy)]
 struct Color {
     r: u8,
     g: u8,
