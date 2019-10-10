@@ -308,7 +308,7 @@ impl Ppu {
         let mut x = 0;
         while x < gui::WIDTH {
             let rel_x = x + self.scx as usize;
-            let tile_index = self.vram[self.bg_map_select as usize + y as usize * 8 + rel_x / 8];
+            let tile_index = self.vram[self.bg_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
             let tile_data = get_tile(&self, tile_index, y as usize);
             let offset_x = rel_x % 8;
             for tile_x in offset_x..8 {
@@ -334,7 +334,7 @@ impl Ppu {
         let mut x = self.wx as usize;
         while x < gui::WIDTH {
             let rel_x = x - self.wx as usize;
-            let tile_index = self.vram[self.win_map_select as usize + y as usize * 8 + rel_x / 8];
+            let tile_index = self.vram[self.win_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
             let tile_data = get_tile(&self, tile_index, y as usize);
             for tile_x in 0..8 {
                 match self.texture[self.ly as usize].get_mut(x + tile_x) {
@@ -387,6 +387,7 @@ impl Ppu {
         self.last_time = Instant::now();
         let elapsed = self.last_time.duration_since(last_time).as_micros();
         let sleep = self.last_sleep.as_micros() as i128 + (16_666 - elapsed as i128);
+        // println!("Fps: {}", 1e6 / elapsed as f64);
         if sleep > 0 {
             self.last_sleep = Duration::from_micros(sleep as u64);
             std::thread::sleep(self.last_sleep);

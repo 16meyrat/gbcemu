@@ -324,8 +324,8 @@ impl Cpu {
             addr
         };
 
-        if self.pc == 0x02d1 {
-            //eprintln!("Breakpoint !");
+        if self.pc == 0x0395 {
+            eprintln!("Breakpoint !");
         }
 
         let op = bus.read(self.pc);
@@ -1267,10 +1267,10 @@ impl Cpu {
                 }
             }
             0x28 => {
-                if self.zerof == 0 {
+                if self.zerof != 0 {
                     let pc = self.pc;
                     let addr = jrel(self, bus);
-                    disasm_pc!(pc, "JR NZ, {:#x}", addr);
+                    disasm_pc!(pc, "JR Z, {:#x}", addr);
                 }else{
                     self.wait = 8;
                     disasm!("JR Z, <no_jump>");
@@ -1278,10 +1278,10 @@ impl Cpu {
                 }
             }
             0x38 => {
-                if self.carryf == 0 {
+                if self.carryf != 0 {
                     let pc = self.pc;
                     let addr = jrel(self, bus);
-                    disasm_pc!(pc, "JR NC, {:#x}", addr);
+                    disasm_pc!(pc, "JR C, {:#x}", addr);
                 }else{
                     self.wait = 8;
                     disasm!("JR C, <no_jump>");
