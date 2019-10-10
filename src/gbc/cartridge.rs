@@ -43,7 +43,7 @@ impl Cartridge for NRom {
     fn read(&self, addr: u16) -> u8{
         match addr {
             x if x < 0x8000 => self.banks[addr as usize],
-            x if x >= 0xa000 && x < 0xc000 => self.ram[addr as usize - 0xa000],
+            x if x >= 0xa000 && x < 0xc000 => *self.ram.get(addr as usize - 0xa000).unwrap_or(&0),
             _ => panic!("Illegal cartridge read at {:#x}", addr),
         }
     }

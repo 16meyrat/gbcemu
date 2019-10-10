@@ -174,7 +174,7 @@ impl Cpu {
                 let (new_a, carry) = u8::overflowing_add(self.$arg, self.a);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 0;
-                self.half_carryf = if ((before & 0xf) + self.a & 0xf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((before & 0xf) + (self.a & 0xf)) & 0x10 != 0 {1} else {0};
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 4;
@@ -1452,6 +1452,44 @@ impl Cpu {
                 self.add_subf = 0;
                 self.carryf = if self.carryf != 0 {0} else {1};
                 disasm!("CCF");
+            }
+            0x07 => {
+                self.wait = 4;
+                self.zerof = 0;
+                self.half_carryf = 0;
+                self.add_subf = 0;
+                self.a = u8::rotate_left(self.a, 1);
+                self.carryf = self.a & 1;
+                disasm!("RLCA");
+            }
+            0x17 => {
+                self.wait = 4;
+                self.zerof = 0;
+                self.half_carryf = 0;
+                self.add_subf = 0;
+                let a = (self.a as u16) << 1;
+                self.a = a as u8 | self.carryf;
+                self.carryf = (a >> 8 & 1) as u8;
+                disasm!("RLA");
+            }
+            0x0f => {
+                self.wait = 4;
+                self.zerof = 0;
+                self.half_carryf = 0;
+                self.add_subf = 0;
+                self.a = u8::rotate_right(self.a, 1);
+                self.carryf = self.a >> 7 & 1;
+                disasm!("RRCA");
+            }
+            0x1f => {
+                self.wait = 4;
+                self.zerof = 0;
+                self.half_carryf = 0;
+                self.add_subf = 0;
+                let prev_cary = self.carryf;
+                self.carryf = self.a & 1;
+                self.a = self.a >> 1 |  prev_cary << 7;
+                disasm!("RRA");
             }
             0x37 => {
                 self.wait = 4;
