@@ -290,9 +290,11 @@ impl Ppu {
     }
 
     fn render_line(&mut self) {
-        self.render_background();
-        if self.win_enabled {
-            self.render_window();
+        if self.bg_win_priority {
+            self.render_background();
+            if self.win_enabled {
+                self.render_window();
+            }
         }
     }
 
