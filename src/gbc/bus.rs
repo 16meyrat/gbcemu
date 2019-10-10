@@ -1,6 +1,7 @@
 
 use super::ppu::Ppu;
 use super::memory::Ram;
+use super::timer::Timer;
 use super::cartridge::Cartridge;
 
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use crate::gui;
 pub struct Bus<'a>{
     pub ppu: Ppu,
     ram: Ram,
+    pub timer: Timer,
     pub cartridge: &'a mut dyn Cartridge,
     pub enabled_interrupts: u8,
     pub requested_interrupts: u8,
@@ -39,12 +41,11 @@ impl<'a> Busable for Bus<'a> {
             x if x <= 0xfeff => 0,
             x if x >= 0xff80 && x <= 0xfffe => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
-            0xff00 => 0, // joypad
-            0xff03 => 0, // joypad
-            0xff04 => 0, // timer
-            0xff05 => 0, // timer
-            0xff06 => 0, // timer
-            0xff07 => 0, // timer
+            0xff00 => 0x1f, // joypad
+            0xff04 => 0, // timer DIV
+            0xff05 => self.timer.get_tima(),
+            0xff06 => self.timer.get_tma(),
+            0xff07 => self.timer.get_tac(),
             0xff0f => self.requested_interrupts,
             0xff40 => self.ppu.get_lcdc(),
             0xff41 => self.ppu.get_lcds(),
@@ -80,7 +81,10 @@ impl<'a> Busable for Bus<'a> {
             x if x >= 0xff80 && x <= 0xfffe => self.ram.write(addr, value),
             0xffff => self.enabled_interrupts = value,
             0xff00 => {}, // joypad
-            0xff06 => {}, // timer modulo
+            0xff04 => {}, // timer DIV
+            0xff05 => self.timer.set_tima(value),
+            0xff06 => self.timer.set_tma(value),
+            0xff07 => self.timer.set_tac(value),
             0xff0f => self.requested_interrupts = value,
             0xff40 => self.ppu.set_lcdc(value),
             0xff41 => self.ppu.set_lcds(value),
@@ -109,6 +113,7 @@ impl<'a> Bus<'a> {
         Bus {
             ppu: Ppu::new(rendering_texure),
             ram: Ram::new(),
+            timer: Timer::new(),
             cartridge: cartridge,
             enabled_interrupts: 0xFF,
             requested_interrupts: 0xFF,
@@ -127,7 +132,7 @@ impl<'a> Bus<'a> {
     }
 
     fn dma(&mut self, val: u8) {
-        for addr in 0..0x9f {
+        for addr in 0..0xa0 {
             let byte = self.read((val as u16) << 8 | addr);
             self.write(0xfe00 | addr, byte);
         }

@@ -44,6 +44,10 @@ fn run_emulator(rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui:
             PpuInterrupt::Stat => bus.requested_interrupts |= bus::LCD_STAT,
         };
 
+        if bus.timer.tick() {
+            bus.requested_interrupts |= bus::TIMER;
+        }
+
         match rx.try_recv() {
             Ok(event) => {
                 match event {
