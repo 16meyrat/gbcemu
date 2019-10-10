@@ -981,7 +981,7 @@ impl Cpu {
                 let (new_a, carry) = u8::overflowing_sub(self.a, val);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 0;
-                self.half_carryf = if ((self.a & 0xf) - val & 0xf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if (self.a & 0xf) < (val & 0xf) {1} else {0};
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 8;
