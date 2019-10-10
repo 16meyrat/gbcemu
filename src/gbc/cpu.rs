@@ -1077,7 +1077,7 @@ impl Cpu {
                 let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
                 self.add_subf = 0;
-                self.half_carryf = if ((arg & 0xf) + self.a & 0xf + self.carryf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((arg & 0xf) + (self.a & 0xf) + self.carryf) & 0x10 != 0 {1} else {0};
                 self.carryf = if carry || carry2 {1} else {0};
                 self.a = new_a2;
                 self.wait = 8;
@@ -1090,7 +1090,7 @@ impl Cpu {
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = if (self.a & 0xf - (arg & 0xf) - self.carryf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = ((self.a & 0xf) + self.carryf < (arg & 0xf)) as u8;
                 self.carryf = if carry || carry2 {1} else {0};
                 self.a = new_a;
                 self.wait = 8;
@@ -1426,6 +1426,11 @@ impl Cpu {
                 self.wait = 4;
                 self.interrupts_enabled = true;
                 disasm!("EI");
+            }
+            0xcb => {
+                eprintln!("{:#x}: CB not supported", self.pc);
+                self.pc += 1;
+                // TODO
             }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);

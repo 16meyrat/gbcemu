@@ -31,11 +31,15 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xe000 => self.ram.read(addr),
             x if x < 0xFE00 => self.ram.read(addr - 0x2000),
             x if x < 0xfea0 => self.ppu.read(addr),
-            x if x < 0xfeff => 0,
+            x if x <= 0xfeff => 0,
             x if x >= 0xff80 && x <= 0xfffe => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
             0xff00 => 0, // joypad
+            0xff03 => 0, // joypad
+            0xff04 => 0, // timer
+            0xff05 => 0, // timer
             0xff06 => 0, // timer
+            0xff07 => 0, // timer
             0xff0f => self.requested_interrupts,
             0xff40 => self.ppu.get_lcdc(),
             0xff41 => self.ppu.get_lcds(),
