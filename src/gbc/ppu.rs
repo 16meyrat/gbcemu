@@ -41,6 +41,7 @@ pub struct Ppu {
 
     wait: usize,
     last_time: Instant,
+    last_sleep: Duration,
 
     rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>,
     texture: Vec<[Color; gui::WIDTH]>,
@@ -86,6 +87,7 @@ impl Ppu {
 
             wait: 0,
             last_time: Instant::now(),
+            last_sleep: Duration::from_millis(0),
 
             rendering_texure,
             texture: vec![[Color::new(0, 0, 0); gui::WIDTH]; gui::HEIGHT],
@@ -127,7 +129,7 @@ impl Ppu {
     }
 
     pub fn set_wx(&mut self, val: u8) {
-        self.wx = val - 7;
+        self.wx = u8::wrapping_sub(val, 7);
     }
 
     pub fn get_wy(&self) -> u8 {
@@ -282,19 +284,10 @@ impl Ppu {
 
     fn render_line(&mut self) {
         self.render_background();
-
-        let last_time = self.last_time;
-        self.last_time = Instant::now();
-        let elapsed = self.last_time.duration_since(last_time).as_micros();
-        if elapsed < (16_666 - 1_000) {
-            sleep(Duration::from_micros(16_666 - elapsed as u64));
-        } else {
-            std::thread::yield_now();
-        }
     }
 
     fn render_background(&mut self) {
-        let get_tile = if let WindowBGTileData::High = self.win_bg_data {
+        let get_tile = if let WindowBGTileData::Low = self.win_bg_data {
             Ppu::get_tile_line_signed
         } else {
             Ppu::get_tile_line_unsigned
@@ -355,6 +348,18 @@ impl Ppu {
                     index += 3;
                 }
             }
+        }
+
+        let last_time = self.last_time;
+        self.last_time = Instant::now();
+        let elapsed = self.last_time.duration_since(last_time).as_micros();
+        let sleep = self.last_sleep.as_micros() as i128 + (16_666 - elapsed as i128);
+        if sleep > 0 {
+            self.last_sleep = Duration::from_micros(sleep as u64);
+            std::thread::sleep(self.last_sleep);
+        } else {
+            self.last_sleep = Duration::from_micros(0);
+            std::thread::yield_now();
         }
     }
 }
