@@ -283,7 +283,7 @@ impl Cpu {
 
         macro_rules! xorA {
             ($arg:expr) => ({
-                self.a |= $arg;
+                self.a ^= $arg;
                 self.zerof = if self.a == 0 {1} else {0};
                 self.add_subf = 0;
                 self.half_carryf = 0;
@@ -1460,11 +1460,60 @@ impl Cpu {
     }
 
     fn cb_ext(&mut self, bus: &mut Bus) {
-         macro_rules! disasm {
+        macro_rules! disasm {
             ($($arg:tt)+) => (
                 if cfg!(debug_assertions) {
                     print!("0x{:<8x}: ", self.pc - 1);
                     println!($($arg)+);
+                }
+            )
+        }
+
+        macro_rules! sub_match {
+            ($opcode:ident, $operation:ident) => (
+                match $opcode & 0x7 {
+                    0x00 => {
+                        self.wait = 8;
+                        self.b = self.$operation(self.b, ($opcode & 0x38) >> 3);
+                        disasm!("{} B", stringify!($operation));
+                    }
+                    0x01 => {
+                        self.wait = 8;
+                        self.c = self.$operation(self.c, ($opcode & 0x38) >> 3);
+                        disasm!("{} C", stringify!($operation));
+                    }
+                    0x02 => {
+                        self.wait = 8;
+                        self.d = self.$operation(self.d, ($opcode & 0x38) >> 3);
+                        disasm!("{} D", stringify!($operation));
+                    }
+                    0x03 => {
+                        self.wait = 8;
+                        self.e = self.$operation(self.e, ($opcode & 0x38) >> 3);
+                        disasm!("{} E", stringify!($operation));
+                    }
+                    0x04 => {
+                        self.wait = 8;
+                        self.h = self.$operation(self.h, ($opcode & 0x38) >> 3);
+                        disasm!("{} H", stringify!($operation));
+                    }
+                    0x05 => {
+                        self.wait = 8;
+                        self.l = self.$operation(self.l, ($opcode & 0x38) >> 3);
+                        disasm!("{} L", stringify!($operation));
+                    }
+                    0x07 => {
+                        self.wait = 8;
+                        self.a = self.$operation(self.a, ($opcode & 0x38) >> 3);
+                        disasm!("{} A", stringify!($operation));
+                    }
+                    0x06 => {
+                        self.wait = 16;
+                        let hl = (self.h as u16) << 8 | self.l as u16;
+                        bus.write(hl, self.$operation(bus.read(hl), ($opcode & 0x38) >> 3));
+                        disasm!("{} (HL)", stringify!($operation));
+                    }
+                    _ => panic!("Invalid cb submatch {:#x}", $opcode)
                 }
             )
         }
@@ -1800,6 +1849,15 @@ impl Cpu {
                 bus.write(hl, self.srl(bus.read(hl)));
                 disasm!("srl (HL)");
             }
+            x if x & 0xc0 == 0x80 & 0xc0 => {
+                sub_match!(x, res);
+            }
+            x if x & 0xc0 == 0x40 & 0xc0 => {
+                sub_match!(x, bit);
+            }
+            x if x & 0xc0 == 0xC0 & 0xc0 => {
+                sub_match!(x, set);
+            }
             _ => eprintln!("{:#x}: CB not supported : {:#x}", self.pc, op),
         }
     }
@@ -1877,6 +1935,20 @@ impl Cpu {
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
+    }
+
+    fn res(&self, val: u8, index: u8) -> u8 {
+        val & !(1 << index)
+    }
+
+    fn set(&self, val: u8, index: u8) -> u8 {
+        val | (1 << index)
+    }
+
+    fn bit(&mut self, val: u8, index: u8) -> u8 {
+        self.add_subf = 0;
+        self.half_carryf = 1;
+        val ^ (1 << index)
     }
 
     /*
