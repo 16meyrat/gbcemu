@@ -325,7 +325,7 @@ impl Cpu {
         };
 
         if self.pc == 0x0395 {
-            eprintln!("Breakpoint !");
+            //eprintln!("Breakpoint !");
         }
 
         let op = bus.read(self.pc);
@@ -645,6 +645,11 @@ impl Cpu {
                 bus.write((self.h as u16) << 8 | self.l as u16, self.b);
                 self.wait = 8;
                 disasm!("LD (HL), B");
+            }
+            0x71 => {
+                bus.write((self.h as u16) << 8 | self.l as u16, self.c);
+                self.wait = 8;
+                disasm!("LD (HL), C");
             }
             0x72 => {
                 bus.write((self.h as u16) << 8 | self.l as u16, self.d);
