@@ -1428,9 +1428,8 @@ impl Cpu {
                 disasm!("EI");
             }
             0xcb => {
-                eprintln!("{:#x}: CB not supported", self.pc);
                 self.pc += 1;
-                // TODO
+                self.cb_ext(bus);
             }
             _ => {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
@@ -1438,12 +1437,76 @@ impl Cpu {
         };
         self.pc += 1;
     }
+
+    fn cb_ext(&mut self, bus: &mut Bus) {
+         macro_rules! disasm {
+            ($($arg:tt)+) => (
+                if cfg!(debug_assertions) {
+                    print!("0x{:<8x}: ", self.pc - 1);
+                    println!($($arg)+);
+                }
+            )
+        }
+
+        let op = bus.read(self.pc);
+
+        match op {
+            0x20 => {
+                self.wait = 8;
+                self.b = self.sla(self.b);
+                disasm!("SLA B");
+            }
+            0x21 => {
+                self.wait = 8;
+                self.c = self.sla(self.c);
+                disasm!("SLA C");
+            }
+            0x22 => {
+                self.wait = 8;
+                self.d = self.sla(self.d);
+                disasm!("SLA D");
+            }
+            0x23 => {
+                self.wait = 8;
+                self.e = self.sla(self.e);
+                disasm!("SLA E");
+            }
+            0x24 => {
+                self.wait = 8;
+                self.h = self.sla(self.h);
+                disasm!("SLA H");
+            }
+            0x25 => {
+                self.wait = 8;
+                self.l = self.sla(self.l);
+                disasm!("SLA L");
+            }
+            0x27 => {
+                self.wait = 8;
+                self.a = self.sla(self.a);
+                disasm!("SLA A");
+            }
+            0x26 => {
+                self.wait = 16;
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                bus.write(hl, self.sla(bus.read(hl)));
+                disasm!("SLA (HL)");
+            }
+            _ => eprintln!("{:#x}: CB not supported : {:#x}", self.pc, op),
+        }
+    }
+
+    fn sla(&mut self, val: u8) -> u8 {
+        let res = (val as u16) << 1;
+        self.carryf = (res >> 8 & 1) as u8;
+        self.zerof = if res & 0xff != 0 {0} else {1};
+        self.half_carryf = 0;
+        self.add_subf = 0;
+        res as u8
+    }
     /*
     let mut hl = (self.h as u16) << 8 | self.l as u16;
-    hl += 1;
-    self.h = (hl >> 8) as u8;
-    self.l = (hl & 0xff) as u8;
-        */
+   */
 
 }
 

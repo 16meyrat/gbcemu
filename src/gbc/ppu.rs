@@ -56,9 +56,9 @@ impl Ppu {
     pub fn new(rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>) -> Self {
         
         Ppu{
-            background_palette: (0..3).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
-            obj_palette0: (0..3).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
-            obj_palette1: (0..3).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
+            background_palette: (0..4).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
+            obj_palette0: (0..4).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
+            obj_palette1: (0..4).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
             scx: 0,
             scy: 0,
             wx: 0,
@@ -222,6 +222,10 @@ impl Ppu {
     }
 
     pub fn tick(&mut self) -> PpuInterrupt {
+        if !self.enabled {
+            return PpuInterrupt::None;
+        }
+
         if self.wait != 0 {
             self.wait -= 1;
             return PpuInterrupt::None;
@@ -290,7 +294,7 @@ impl Ppu {
     }
 
     fn render_background(&mut self) {
-        let get_tile = if let WindowBGTileData::Low = self.win_bg_data {
+        let get_tile = if let WindowBGTileData::High = self.win_bg_data {
             Ppu::get_tile_line_signed
         } else {
             Ppu::get_tile_line_unsigned
@@ -303,9 +307,12 @@ impl Ppu {
             let tile_data = get_tile(&self, tile_index, y as usize);
             let offset_x = rel_x % 8;
             for tile_x in offset_x..8 {
-                self.texture[self.ly as usize][x + (8 - tile_x)] = self.background_palette[tile_data[tile_x as usize] as usize];
+                match self.texture[self.ly as usize].get_mut(x + tile_x - offset_x) {
+                    Some(pixel) => *pixel = self.background_palette[tile_data[tile_x as usize] as usize],
+                    _ => {return;}
+                } 
             }
-            x += offset_x;
+            x += 8 - offset_x;
         }
     }
 
@@ -330,7 +337,7 @@ impl Ppu {
         let h = self.vram[addr + 1];
         let mut res = [0u8; 8];
         for i in 0..8 {
-            res[i] = ((h & 1u8 << 8-i) >> 7-i) | ((l & 1u8 << 8-i) >> 8-i)
+            res[i] = ((h >> 7-i & 1u8) << 1) | ((l >> 7-i & 1u8));
         }
         res
     }
