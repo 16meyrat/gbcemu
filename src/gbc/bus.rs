@@ -41,7 +41,7 @@ impl<'a> Busable for Bus<'a> {
             x if x <= 0xfeff => 0,
             x if x >= 0xff80 && x <= 0xfffe => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
-            0xff00 => 0x1f, // joypad
+            0xff00 => 0x0f, // joypad
             0xff04 => 0, // timer DIV
             0xff05 => self.timer.get_tima(),
             0xff06 => self.timer.get_tma(),
@@ -115,8 +115,8 @@ impl<'a> Bus<'a> {
             ram: Ram::new(),
             timer: Timer::new(),
             cartridge: cartridge,
-            enabled_interrupts: 0xFF,
-            requested_interrupts: 0xFF,
+            enabled_interrupts: 0x0,
+            requested_interrupts: 0x0,
         }
     } 
 

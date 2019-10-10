@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use std::time::{Instant, Duration};
-use std::thread::sleep;
 
 use crate::gui;
 
@@ -80,7 +79,7 @@ impl Ppu {
             int_lcy: false,
             int_oam: false,
 
-            current_mode: Mode::VBlank,
+            current_mode: Mode::OamScan,
 
             vram: [0; 0x2000],
             oam: [0; 0xA0],
@@ -184,7 +183,12 @@ impl Ppu {
     }
 
     pub fn set_lcdc(&mut self, val: u8) {
-        self.enabled = val & 0x80 != 0;
+        self.enabled = if val & 0x80 != 0 {
+            if !self.enabled {
+                self.wait = 70224;
+            }
+            true
+        } else {false};
         self.win_map_select = match val & 0x40 {
             0 => WindowMapSelect::Low,
             _ => WindowMapSelect::High,
@@ -237,12 +241,12 @@ impl Ppu {
 
         match self.current_mode {
             Mode::OamScan => {
-                self.wait = 200;
+                self.wait = 170;
                 self.current_mode = Mode::Rendering;
             }
             Mode::Rendering => {
                 self.render_line();
-                self.wait = 100;
+                self.wait = 202;
                 self.current_mode = Mode::HBlank;
                 if self.int_hblank {
                     res = PpuInterrupt::Stat;
@@ -263,6 +267,9 @@ impl Ppu {
                 } else {
                     self.wait = 80;
                     self.current_mode = Mode::OamScan;
+                    if self.int_oam {
+                        res = PpuInterrupt::Stat;
+                    }
                 }
             }
             Mode::VBlank => {
@@ -395,7 +402,7 @@ enum WindowMapSelect {
 #[derive(Clone, Copy, IntoPrimitive)]
 #[repr(u16)]
 enum WindowBGTileData {
-    Low = 0x0800,
+    Low = 0x1000,
     High = 0x0000,
 }
 

@@ -40,11 +40,19 @@ fn run_emulator(rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui:
 
         match bus.ppu.tick() {
             PpuInterrupt::None => {},
-            PpuInterrupt::VBlank => bus.requested_interrupts |= bus::VBLANK,
-            PpuInterrupt::Stat => bus.requested_interrupts |= bus::LCD_STAT,
-        };
+            PpuInterrupt::VBlank => {
+                if bus.enabled_interrupts & bus::VBLANK != 0 {
+                    bus.requested_interrupts |= bus::VBLANK;
+                }
+            }
+            PpuInterrupt::Stat => {
+                if bus.enabled_interrupts & bus::LCD_STAT != 0 {
+                    bus.requested_interrupts |= bus::LCD_STAT;
+                }
+            }
+        }
 
-        if bus.timer.tick() {
+        if bus.timer.tick() && bus.enabled_interrupts & bus::TIMER != 0 {
             bus.requested_interrupts |= bus::TIMER;
         }
 

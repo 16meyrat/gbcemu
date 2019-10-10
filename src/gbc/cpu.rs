@@ -44,7 +44,7 @@ impl Cpu {
             carryf: 0,
 
             wait: 0,
-            interrupts_enabled: true,
+            interrupts_enabled: false,
         }
     }
 
@@ -64,6 +64,10 @@ impl Cpu {
         self.half_carryf = 0;
         self.carryf = 0;
         self.interrupts_enabled = false;
+    }
+
+    pub fn interrupts_enabled(&self) -> bool {
+        self.interrupts_enabled
     }
 
     fn flags(&self) -> u8 {
@@ -102,6 +106,7 @@ impl Cpu {
         if self.interrupts_enabled && (bus.enabled_interrupts & bus.requested_interrupts != 0){
             let active_interrupts = bus.enabled_interrupts & bus.requested_interrupts;
             self.sp -= 2;
+            self.interrupts_enabled = false;
             bus.write16(self.sp, self.pc);
             self.wait = 20;
             if active_interrupts & VBLANK != 0 {
