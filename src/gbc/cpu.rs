@@ -1427,6 +1427,27 @@ impl Cpu {
                 self.interrupts_enabled = true;
                 disasm!("EI");
             }
+            0x2f => {
+                self.wait = 4;
+                self.half_carryf = 1;
+                self.add_subf = 1;
+                self.a = !self.a;
+                disasm!("CPL");
+            }
+            0x3f => {
+                self.wait = 4;
+                self.half_carryf = 0;
+                self.add_subf = 0;
+                self.carryf = if self.carryf != 0 {0} else {1};
+                disasm!("CCF");
+            }
+            0x37 => {
+                self.wait = 4;
+                self.half_carryf = 0;
+                self.add_subf = 0;
+                self.carryf = 1;
+                disasm!("SCF");
+            }
             0xcb => {
                 self.pc += 1;
                 self.cb_ext(bus);
@@ -1451,6 +1472,170 @@ impl Cpu {
         let op = bus.read(self.pc);
 
         match op {
+            0x00 => {
+                self.wait = 8;
+                self.b = self.rlc(self.b);
+                disasm!("rlc B");
+            }
+            0x01 => {
+                self.wait = 8;
+                self.c = self.rlc(self.c);
+                disasm!("rlc C");
+            }
+            0x02 => {
+                self.wait = 8;
+                self.d = self.rlc(self.d);
+                disasm!("rlc D");
+            }
+            0x03 => {
+                self.wait = 8;
+                self.e = self.rlc(self.e);
+                disasm!("rlc E");
+            }
+            0x04 => {
+                self.wait = 8;
+                self.h = self.rlc(self.h);
+                disasm!("rlc H");
+            }
+            0x05 => {
+                self.wait = 8;
+                self.l = self.rlc(self.l);
+                disasm!("rlc L");
+            }
+            0x07 => {
+                self.wait = 8;
+                self.a = self.rlc(self.a);
+                disasm!("rlc A");
+            }
+            0x06 => {
+                self.wait = 16;
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                bus.write(hl, self.rlc(bus.read(hl)));
+                disasm!("rlc (HL)");
+            }
+            0x08 => {
+                self.wait = 8;
+                self.b = self.rrc(self.b);
+                disasm!("rrc B");
+            }
+            0x09 => {
+                self.wait = 8;
+                self.c = self.rrc(self.c);
+                disasm!("rrc C");
+            }
+            0x0a => {
+                self.wait = 8;
+                self.d = self.rrc(self.d);
+                disasm!("rrc D");
+            }
+            0x0b => {
+                self.wait = 8;
+                self.e = self.rrc(self.e);
+                disasm!("rrc E");
+            }
+            0x0c => {
+                self.wait = 8;
+                self.h = self.rrc(self.h);
+                disasm!("rrc H");
+            }
+            0x0d => {
+                self.wait = 8;
+                self.l = self.rrc(self.l);
+                disasm!("rrc L");
+            }
+            0x0f => {
+                self.wait = 8;
+                self.a = self.rrc(self.a);
+                disasm!("rrc A");
+            }
+            0x0e => {
+                self.wait = 16;
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                bus.write(hl, self.rrc(bus.read(hl)));
+                disasm!("rrc (HL)");
+            }
+            0x10 => {
+                self.wait = 8;
+                self.b = self.rl(self.b);
+                disasm!("rl B");
+            }
+            0x11 => {
+                self.wait = 8;
+                self.c = self.rl(self.c);
+                disasm!("rl C");
+            }
+            0x12 => {
+                self.wait = 8;
+                self.d = self.rl(self.d);
+                disasm!("rl D");
+            }
+            0x13 => {
+                self.wait = 8;
+                self.e = self.rl(self.e);
+                disasm!("rl E");
+            }
+            0x14 => {
+                self.wait = 8;
+                self.h = self.rl(self.h);
+                disasm!("rl H");
+            }
+            0x15 => {
+                self.wait = 8;
+                self.l = self.rl(self.l);
+                disasm!("rl L");
+            }
+            0x17 => {
+                self.wait = 8;
+                self.a = self.rl(self.a);
+                disasm!("rl A");
+            }
+            0x16 => {
+                self.wait = 16;
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                bus.write(hl, self.rl(bus.read(hl)));
+                disasm!("rl (HL)");
+            }
+            0x18 => {
+                self.wait = 8;
+                self.b = self.rr(self.b);
+                disasm!("rr B");
+            }
+            0x19 => {
+                self.wait = 8;
+                self.c = self.rr(self.c);
+                disasm!("rr C");
+            }
+            0x1a => {
+                self.wait = 8;
+                self.d = self.rr(self.d);
+                disasm!("rr D");
+            }
+            0x1b => {
+                self.wait = 8;
+                self.e = self.rr(self.e);
+                disasm!("rr E");
+            }
+            0x1c => {
+                self.wait = 8;
+                self.h = self.rr(self.h);
+                disasm!("rr H");
+            }
+            0x1d => {
+                self.wait = 8;
+                self.l = self.rr(self.l);
+                disasm!("rr L");
+            }
+            0x1f => {
+                self.wait = 8;
+                self.a = self.rr(self.a);
+                disasm!("rr A");
+            }
+            0x1e => {
+                self.wait = 16;
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                bus.write(hl, self.rr(bus.read(hl)));
+                disasm!("rr (HL)");
+            }
             0x20 => {
                 self.wait = 8;
                 self.b = self.sla(self.b);
@@ -1492,6 +1677,129 @@ impl Cpu {
                 bus.write(hl, self.sla(bus.read(hl)));
                 disasm!("SLA (HL)");
             }
+            0x28 => {
+                self.wait = 8;
+                self.b = self.sra(self.b);
+                disasm!("sra B");
+            }
+            0x29 => {
+                self.wait = 8;
+                self.c = self.sra(self.c);
+                disasm!("sra C");
+            }
+            0x2a => {
+                self.wait = 8;
+                self.d = self.sra(self.d);
+                disasm!("sra D");
+            }
+            0x2b => {
+                self.wait = 8;
+                self.e = self.sra(self.e);
+                disasm!("sra E");
+            }
+            0x2c => {
+                self.wait = 8;
+                self.h = self.sra(self.h);
+                disasm!("sra H");
+            }
+            0x2d => {
+                self.wait = 8;
+                self.l = self.sra(self.l);
+                disasm!("sra L");
+            }
+            0x2f => {
+                self.wait = 8;
+                self.a = self.sra(self.a);
+                disasm!("sra A");
+            }
+            0x2e => {
+                self.wait = 16;
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                bus.write(hl, self.sra(bus.read(hl)));
+                disasm!("sra (HL)");
+            }
+            0x30 => {
+                self.wait = 8;
+                self.b = self.swap(self.b);
+                disasm!("swap B");
+            }
+            0x31 => {
+                self.wait = 8;
+                self.c = self.swap(self.c);
+                disasm!("swap C");
+            }
+            0x32 => {
+                self.wait = 8;
+                self.d = self.swap(self.d);
+                disasm!("swap D");
+            }
+            0x33 => {
+                self.wait = 8;
+                self.e = self.swap(self.e);
+                disasm!("swap E");
+            }
+            0x34 => {
+                self.wait = 8;
+                self.h = self.swap(self.h);
+                disasm!("swap H");
+            }
+            0x35 => {
+                self.wait = 8;
+                self.l = self.swap(self.l);
+                disasm!("swap L");
+            }
+            0x37 => {
+                self.wait = 8;
+                self.a = self.swap(self.a);
+                disasm!("swap A");
+            }
+            0x36 => {
+                self.wait = 16;
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                bus.write(hl, self.swap(bus.read(hl)));
+                disasm!("swap (HL)");
+            }
+            0x38 => {
+                self.wait = 8;
+                self.b = self.srl(self.b);
+                disasm!("srl B");
+            }
+            0x39 => {
+                self.wait = 8;
+                self.c = self.srl(self.c);
+                disasm!("srl C");
+            }
+            0x3a => {
+                self.wait = 8;
+                self.d = self.srl(self.d);
+                disasm!("srl D");
+            }
+            0x3b => {
+                self.wait = 8;
+                self.e = self.srl(self.e);
+                disasm!("srl E");
+            }
+            0x3c => {
+                self.wait = 8;
+                self.h = self.srl(self.h);
+                disasm!("srl H");
+            }
+            0x3d => {
+                self.wait = 8;
+                self.l = self.srl(self.l);
+                disasm!("srl L");
+            }
+            0x3f => {
+                self.wait = 8;
+                self.a = self.srl(self.a);
+                disasm!("srl A");
+            }
+            0x3e => {
+                self.wait = 16;
+                let hl = (self.h as u16) << 8 | self.l as u16;
+                bus.write(hl, self.srl(bus.read(hl)));
+                disasm!("srl (HL)");
+            }
             _ => eprintln!("{:#x}: CB not supported : {:#x}", self.pc, op),
         }
     }
@@ -1504,6 +1812,73 @@ impl Cpu {
         self.add_subf = 0;
         res as u8
     }
+
+    fn sra(&mut self, val: u8) -> u8 {
+        let mut res = val  >> 1;
+        res |= val & 0x80;
+        self.carryf = (val & 1) as u8;
+        self.zerof = if res & 0xff != 0 {0} else {1};
+        self.half_carryf = 0;
+        self.add_subf = 0;
+        res as u8
+    }
+
+    fn rlc(&mut self, val: u8) -> u8 {
+        let res = u8::rotate_left(val, 1);
+        self.carryf = (res >> 7 & 1) as u8;
+        self.zerof = if res != 0 {0} else {1};
+        self.half_carryf = 0;
+        self.add_subf = 0;
+        res as u8
+    }
+    fn rrc(&mut self, val: u8) -> u8 {
+        let res = u8::rotate_right(val, 1);
+        self.carryf = (res & 1) as u8;
+        self.zerof = if res != 0 {0} else {1};
+        self.half_carryf = 0;
+        self.add_subf = 0;
+        res as u8
+    }
+    fn rl(&mut self, val: u8) -> u8 {
+        let mut res = (val as u16) << 1;
+        res |= self.carryf as u16;
+        self.carryf = (res >> 8 & 1) as u8;
+        self.zerof = if res != 0 {0} else {1};
+        self.half_carryf = 0;
+        self.add_subf = 0;
+        res as u8
+    }
+    fn rr(&mut self, val: u8) -> u8 {
+        let mut res = (val as u16) << 7;
+        res |= (self.carryf as u16) << 15;
+        res >>= 8;
+        self.carryf = (val & 1) as u8;
+        self.zerof = if res != 0 {0} else {1};
+        self.half_carryf = 0;
+        self.add_subf = 0;
+        res as u8
+    }
+
+    fn swap(&mut self, val: u8) -> u8 {
+        let h = val >> 4;
+        let l = val & 0xf;
+        let res = l << 4 | h;
+        self.carryf = 0;
+        self.zerof = if res != 0 {0} else {1};
+        self.half_carryf = 0;
+        self.add_subf = 0;
+        res as u8
+    }
+
+    fn srl(&mut self, val: u8) -> u8 {
+        let res = val >> 1;
+        self.carryf = (val & 1) as u8;
+        self.zerof = if res & 0xff != 0 {0} else {1};
+        self.half_carryf = 0;
+        self.add_subf = 0;
+        res as u8
+    }
+
     /*
     let mut hl = (self.h as u16) << 8 | self.l as u16;
    */
