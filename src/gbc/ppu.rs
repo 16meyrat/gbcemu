@@ -185,7 +185,8 @@ impl Ppu {
     pub fn set_lcdc(&mut self, val: u8) {
         self.enabled = if val & 0x80 != 0 {
             if !self.enabled {
-                self.wait = 70224;
+                self.ly = 0;
+                self.current_mode = Mode::OamScan;
             }
             true
         } else {false};
@@ -261,9 +262,7 @@ impl Ppu {
                     self.render();
                     self.wait = 456;
                     self.current_mode = Mode::VBlank;
-                    if self.int_vblank {
-                        res = PpuInterrupt::VBlank;
-                    }
+                    res = PpuInterrupt::VBlank;
                 } else {
                     self.wait = 80;
                     self.current_mode = Mode::OamScan;
@@ -276,6 +275,7 @@ impl Ppu {
                 if self.ly < 154 {
                     self.wait = 456;
                     self.ly += 1;
+                    res = PpuInterrupt::VBlank;
                 } else {
                     self.ly = 0;
                     self.wait = 80;
@@ -291,6 +291,9 @@ impl Ppu {
 
     fn render_line(&mut self) {
         self.render_background();
+        if self.win_enabled {
+            self.render_window();
+        }
     }
 
     fn render_background(&mut self) {
@@ -317,7 +320,28 @@ impl Ppu {
     }
 
     fn render_window(&mut self) {
-        
+        let get_tile = if let WindowBGTileData::Low = self.win_bg_data {
+            Ppu::get_tile_line_signed
+        } else {
+            Ppu::get_tile_line_unsigned
+        };
+        let y = match u8::checked_sub(self.ly, self.wy) {
+            Some(result) => result,
+            _ => return,
+        };
+        let mut x = self.wx as usize;
+        while x < gui::WIDTH {
+            let rel_x = x - self.wx as usize;
+            let tile_index = self.vram[self.win_map_select as usize + y as usize * 8 + rel_x / 8];
+            let tile_data = get_tile(&self, tile_index, y as usize);
+            for tile_x in 0..8 {
+                match self.texture[self.ly as usize].get_mut(x + tile_x) {
+                    Some(pixel) => *pixel = self.background_palette[tile_data[tile_x as usize] as usize],
+                    _ => {return;}
+                } 
+            }
+            x += 8;
+        }
     }
 
     fn get_tile_line_signed(&self, nb: u8 , y: usize) -> [u8; 8] {

@@ -66,10 +66,6 @@ impl Cpu {
         self.interrupts_enabled = false;
     }
 
-    pub fn interrupts_enabled(&self) -> bool {
-        self.interrupts_enabled
-    }
-
     fn flags(&self) -> u8 {
         self.zerof << ZERO | self.add_subf << ADDSUB | self.half_carryf << HALFCARRY | self.carryf << CARRY
     }
@@ -126,6 +122,8 @@ impl Cpu {
                 bus.requested_interrupts &= !JOYPAD;
             }
             return;
+        } else {
+            bus.requested_interrupts = 0;
         }
 
         macro_rules! disasm {
@@ -265,7 +263,7 @@ impl Cpu {
         macro_rules! andA {
             ($arg:expr) => ({
                 self.a &= $arg;
-                self.zerof = if self.a == 0 {1} else {0};
+                self.zerof = if self.a != 0 {0} else {1};
                 self.add_subf = 0;
                 self.half_carryf = 1;
                 self.carryf = 0;
@@ -325,6 +323,10 @@ impl Cpu {
             this.pc = u16::wrapping_add(this.pc, 1);
             addr
         };
+
+        if self.pc == 0x02d1 {
+            //eprintln!("Breakpoint !");
+        }
 
         let op = bus.read(self.pc);
         match op {
@@ -1210,7 +1212,7 @@ impl Cpu {
                 }
             }
             0xca => {
-                if self.zerof != 0 {
+                if self.zerof == 0 {
                     self.wait = 12;
                     disasm!("JP Z, <no_jump>");
                     self.pc += 2;
@@ -1221,7 +1223,7 @@ impl Cpu {
                 }
             }
             0xda => {
-                if self.carryf != 0 {
+                if self.carryf == 0 {
                     self.wait = 12;
                     disasm!("JP C, <no_jump>");
                     self.pc += 2;
@@ -1254,7 +1256,7 @@ impl Cpu {
                 }
             }
             0x30 => {
-                if self.carryf != 0 {
+                if self.carryf == 0 {
                     let pc = self.pc;
                     let addr = jrel(self, bus);
                     disasm_pc!(pc, "JR NC, {:#x}", addr);
@@ -1480,43 +1482,43 @@ impl Cpu {
                     0x00 => {
                         self.wait = 8;
                         self.b = self.$operation(self.b, ($opcode & 0x38) >> 3);
-                        disasm!("{} B", stringify!($operation));
+                        disasm!("{} B, {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
                     0x01 => {
                         self.wait = 8;
                         self.c = self.$operation(self.c, ($opcode & 0x38) >> 3);
-                        disasm!("{} C", stringify!($operation));
+                        disasm!("{} C, {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
                     0x02 => {
                         self.wait = 8;
                         self.d = self.$operation(self.d, ($opcode & 0x38) >> 3);
-                        disasm!("{} D", stringify!($operation));
+                        disasm!("{} D, {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
                     0x03 => {
                         self.wait = 8;
                         self.e = self.$operation(self.e, ($opcode & 0x38) >> 3);
-                        disasm!("{} E", stringify!($operation));
+                        disasm!("{} E, {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
                     0x04 => {
                         self.wait = 8;
                         self.h = self.$operation(self.h, ($opcode & 0x38) >> 3);
-                        disasm!("{} H", stringify!($operation));
+                        disasm!("{} H, {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
                     0x05 => {
                         self.wait = 8;
                         self.l = self.$operation(self.l, ($opcode & 0x38) >> 3);
-                        disasm!("{} L", stringify!($operation));
+                        disasm!("{} L, {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
                     0x07 => {
                         self.wait = 8;
                         self.a = self.$operation(self.a, ($opcode & 0x38) >> 3);
-                        disasm!("{} A", stringify!($operation));
+                        disasm!("{} A, {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
                     0x06 => {
                         self.wait = 16;
                         let hl = (self.h as u16) << 8 | self.l as u16;
                         bus.write(hl, self.$operation(bus.read(hl), ($opcode & 0x38) >> 3));
-                        disasm!("{} (HL)", stringify!($operation));
+                        disasm!("{} (HL), {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
                     _ => panic!("Invalid cb submatch {:#x}", $opcode)
                 }

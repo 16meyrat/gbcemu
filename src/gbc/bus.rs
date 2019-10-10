@@ -11,11 +11,13 @@ use crate::gui;
 
 pub struct Bus<'a>{
     pub ppu: Ppu,
-    ram: Ram,
     pub timer: Timer,
     pub cartridge: &'a mut dyn Cartridge,
     pub enabled_interrupts: u8,
     pub requested_interrupts: u8,
+
+    ram: Ram,
+    joypad: u8,
 }
 
 pub trait Busable {
@@ -41,7 +43,7 @@ impl<'a> Busable for Bus<'a> {
             x if x <= 0xfeff => 0,
             x if x >= 0xff80 && x <= 0xfffe => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
-            0xff00 => 0x0f, // joypad
+            0xff00 => 0x3f, // joypad
             0xff04 => 0, // timer DIV
             0xff05 => self.timer.get_tima(),
             0xff06 => self.timer.get_tma(),
@@ -77,7 +79,7 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xe000 => self.ram.write(addr, value),
             x if x < 0xFE00 => self.ram.write(addr - 0x2000, value),
             x if x < 0xfea0 => self.ppu.write(addr, value),
-            x if x <= 0xfeff => {},
+            x if x <= 0xfeff => self.joypad = value & 0xf0 | self.joypad & 0xf,
             x if x >= 0xff80 && x <= 0xfffe => self.ram.write(addr, value),
             0xffff => self.enabled_interrupts = value,
             0xff00 => {}, // joypad
@@ -117,6 +119,7 @@ impl<'a> Bus<'a> {
             cartridge: cartridge,
             enabled_interrupts: 0x0,
             requested_interrupts: 0x0,
+            joypad: 0xf,
         }
     } 
 
