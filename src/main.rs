@@ -12,24 +12,33 @@ use gui::{Message, Gui};
 
 use std::thread;
 use std::sync::{mpsc, Arc, Mutex};
+use std::env;
 
 extern crate num_enum;
 extern crate sdl2;
 extern crate arrayvec;
 
 fn main() {
+
+    if env::args().count() != 2 {
+        eprintln!("Please enter the path to ROM.GB");
+        return;
+    }
+
+    let rom_name = env::args().nth(1).unwrap();
+
     let (tx, rx) = mpsc::channel::<gui::Message>();
     let mut gui = Gui::new(tx);
     let texture = gui.get_texture();
     let emu_thread = thread::spawn(move || {
-        run_emulator(rx, texture);
+        run_emulator(rom_name, rx, texture);
     });
     gui.run();
     emu_thread.join().unwrap();
 }
 
-fn run_emulator(rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui::SIZE]>>) {
-    let mut rom = load_rom("Tetris.GB");
+fn run_emulator(rom_name : String, rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui::SIZE]>>) {
+    let mut rom = load_rom(&rom_name);
     let mut bus = Bus::new(&mut *rom, texture);
     let mut cpu = Cpu::new();
 
