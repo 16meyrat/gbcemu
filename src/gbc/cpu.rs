@@ -1498,6 +1498,60 @@ impl Cpu {
                 self.carryf = 1;
                 disasm!("SCF");
             }
+            0x27 => {
+                self.wait = 4;
+                let h = self.a >> 4;
+                let l = self.a & 0xf;
+                if self.add_subf == 0 {
+                    if self.carryf == 0 && self.half_carryf==0 && h <= 9 && l <=9 {
+                        self.a = self.a;
+                        self.carryf = 0;
+                    } else if self.carryf == 0 && self.half_carryf==0 &&h <= 8 && l >= 0xa && l <= 0xf {
+                        self.a = u8::wrapping_add(self.a, 6);
+                        self.carryf = 0;
+                    } else if self.carryf == 0 && self.half_carryf==1 &&h <= 9 &&  l <= 0x3 {
+                        self.a = u8::wrapping_add(self.a, 6);
+                        self.carryf = 0;
+                    } else if self.carryf == 0 && self.half_carryf==0 &&h <= 0xf && h >= 0xa && l <= 0x9 {
+                        self.a = u8::wrapping_add(self.a,0x60);
+                        self.carryf = 1;
+                    } else if self.carryf == 0 && self.half_carryf==0 &&h >= 0x9 && h <=0xf && l >= 0xa && l <= 0xf {
+                        self.a = u8::wrapping_add(self.a,0x66);
+                        self.carryf = 1;
+                    } else if self.carryf == 0 && self.half_carryf==1 && h >= 0xa && h <=0xf && l <= 0x3 {
+                        self.a = u8::wrapping_add(self.a,0x66);
+                        self.carryf = 1;
+                    } else if self.carryf == 1 && self.half_carryf==0 && h <=0x2 && l <= 0x9 {
+                        self.a = u8::wrapping_add(self.a,0x60);
+                        self.carryf = 1;
+                    } else if self.carryf == 1 && self.half_carryf==0 && h <=0x2 && l >= 0xa && l <= 0xf {
+                        self.a = u8::wrapping_add(self.a,0x66);
+                        self.carryf = 1;
+                    } else if self.carryf == 1 && self.half_carryf==1 && h <=0x3 && l <= 0x3 {
+                        self.a = u8::wrapping_add(self.a,0x66);
+                        self.carryf = 1;
+                    } else {
+                        eprintln!("Bad DAA");
+                    }
+                } else {
+                    if self.carryf == 0 && self.half_carryf==0 &&h <= 9 && l <=9 {
+                        self.a = self.a;
+                    } else if self.carryf == 0 && self.half_carryf==1 && h <=0x8 && l >= 0x6 && l <= 0xf {
+                        self.a = u8::wrapping_add(self.a,0xfa);
+                        self.carryf = 0;
+                    } else if self.carryf == 1 && self.half_carryf==0 &&h >= 0x7 && h <=0xf && l <= 0x9 {
+                        self.a = u8::wrapping_add(self.a,0xa0);
+                        self.carryf = 1;
+                    } else if self.carryf == 1 && self.half_carryf==1 &&h >= 0x6 && h <=0xf && l >= 0x6 && l <= 0xf {
+                        self.a = u8::wrapping_add(self.a,0x9a);
+                        self.carryf = 1;
+                    } else {
+                        eprintln!("Bad DAA");
+                    }
+                }
+                self.zerof = (self.a == 0) as u8;
+                disasm!("DAA");
+            }
             0xcb => {
                 self.pc += 1;
                 self.cb_ext(bus);
