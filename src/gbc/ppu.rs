@@ -295,6 +295,9 @@ impl Ppu {
             if self.win_enabled {
                 self.render_window();
             }
+            if self.sprite_enabled {
+                self.render_sprites();
+            }
         }
     }
 
@@ -346,6 +349,73 @@ impl Ppu {
         }
     }
 
+    fn render_sprites(&mut self) {
+        let mut oam_data = self.get_sprites_on_line();
+
+        oam_data.sort_by_key(|sprite|sprite.x);
+        for sprite in oam_data {
+            let y_offset = self.ly + 16 - sprite.y;
+            if y_offset < 8 {
+                let tile = self.get_sprite_tile_line(&sprite);
+                let x = (sprite.x - 8) as isize;
+                let palette = if sprite.palette {self.obj_palette1.clone()} else {self.obj_palette0.clone()};
+                if !sprite.x_flip {
+                    for tile_x in 0..8 {
+                        match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {// horrible hack, this index can be negative but will underflow
+                        Some(pixel) => {
+                            if !sprite.behind_bg || pixel.palette_index == 0 {
+                                *pixel = palette[tile[tile_x as usize] as usize];
+                            }
+                        }
+                        _ => {} // do not break, because of the left screen border
+                        } 
+                    }
+                } else {
+                    for tile_x in 0..8 {
+                        match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {
+                        Some(pixel) => {
+                            if !sprite.behind_bg || pixel.palette_index == 0 {
+                                *pixel = palette[tile[7 - tile_x as usize] as usize];
+                            }
+                        }
+                        _ => {} // do not break, because of the left screen border
+                        } 
+                    }
+                }
+            }
+        }
+    }
+
+    fn get_sprites_on_line(&self) -> Vec<SpriteOam> {
+        let mut res = Vec::new();
+        let height = match self.obj_size {
+            ObjSize::Small => 8,
+            ObjSize::Big => 16,
+        };
+        let y_min = u8::saturating_sub(self.ly, height);
+        let y_max = self.ly;
+        for i in (0..0xa0).step_by(4) {
+            let data = &self.oam[i..i+4];
+            let y_sprite = data[0];
+            if y_sprite >= y_min + 16 && y_sprite < y_max + 16 {
+                let flags = data[3];
+                res.push(SpriteOam{
+                    y: data[0],
+                    x: data[1],
+                    tile: data[2],
+                    behind_bg: flags & 80 != 0,
+                    y_flip: flags & 0x40 != 0,
+                    x_flip: flags & 0x20 != 0,
+                    palette: flags & 0x10 != 0,
+                });
+                if res.len() >= 10 {
+                    return res;
+                }
+            }
+        }
+        res
+    }
+
     fn get_tile_line_signed(&self, nb: u8 , y: usize) -> [u8; 8] {
         let addr = (0x1000 + nb as i8 as isize * 16 ) + y as isize % 8 * 2;
         let l = self.vram[addr as usize];
@@ -359,6 +429,37 @@ impl Ppu {
 
     fn get_tile_line_unsigned(&self, nb: u8 , y: usize) -> [u8; 8] {
         let addr = nb as usize * 16 + y % 8 * 2;
+        let l = self.vram[addr];
+        let h = self.vram[addr + 1];
+        let mut res = [0u8; 8];
+        for i in 0..8 {
+            res[i] = ((h >> 7-i & 1u8) << 1) | ((l >> 7-i & 1u8));
+        }
+        res
+    }
+
+    fn get_sprite_tile_line(&self, sprite: &SpriteOam) -> [u8; 8] {
+        let mut y_offset = self.ly + 16 - sprite.y ;
+
+        if sprite.y_flip {
+            let sprite_height = match self.obj_size {
+                ObjSize::Small => 8,
+                ObjSize::Big => 16,
+            };
+            y_offset = sprite_height - 1 - y_offset;
+        }
+
+        let addr = match y_offset {
+            y if y < 8 => {
+                if let ObjSize::Big = self.obj_size {
+                    (sprite.tile & 0xfe) as usize * 16 + y as usize * 2
+                } else {
+                    sprite.tile as usize * 16 + y as usize * 2
+                }
+            },
+            y if y >= 8 => (sprite.tile | 1) as usize * 16 + y as usize % 8 *2, // necessarily ObjSize::Big
+            _ => panic!("Unexpected y offset")
+        };
         let l = self.vram[addr];
         let h = self.vram[addr + 1];
         let mut res = [0u8; 8];
@@ -452,6 +553,16 @@ enum Mode {
     VBlank = 1,
     OamScan = 2,
     Rendering = 3,
+}
+
+struct SpriteOam {
+    x: u8,
+    y: u8,
+    tile: u8,
+    behind_bg: bool,
+    y_flip: bool,
+    x_flip: bool,
+    palette: bool,
 }
 
 #[derive(Clone, Copy)]
