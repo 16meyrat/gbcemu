@@ -324,8 +324,8 @@ impl Cpu {
             addr
         };
 
-        if self.pc == 0x0395 {
-            //eprintln!("Breakpoint !");
+        if self.pc == 0x1944 {
+            eprintln!("Breakpoint !");
         }
 
         let op = bus.read(self.pc);
@@ -1998,7 +1998,8 @@ impl Cpu {
     fn bit(&mut self, val: u8, index: u8) -> u8 {
         self.add_subf = 0;
         self.half_carryf = 1;
-        val ^ (1 << index)
+        self.zerof = if val >> index & 1 == 0 {1} else {0};
+        val
     }
 
     /*

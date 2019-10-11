@@ -353,7 +353,7 @@ impl Ppu {
         let mut oam_data = self.get_sprites_on_line();
 
         oam_data.sort_by_key(|sprite|sprite.x);
-        for sprite in oam_data {
+        for sprite in oam_data.iter().rev() {
             let y_offset = self.ly + 16 - sprite.y;
             if y_offset < 8 {
                 let tile = self.get_sprite_tile_line(&sprite);

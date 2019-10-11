@@ -56,7 +56,11 @@ fn run_emulator(rx: mpsc::Receiver::<gui::Message>, texture: Arc<Mutex<[u8; gui:
             Ok(event) => {
                 match event {
                     Message::WindowClosed => break,
-                    _ => {}
+                    x => {
+                        if bus.joypad.update(x) {
+                            bus.requested_interrupts |= bus::JOYPAD
+                        }
+                    },
                 }
             }
             Err(mpsc::TryRecvError::Disconnected) => break,

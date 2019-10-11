@@ -9,6 +9,7 @@ pub const HEIGHT: usize = 144;
 pub const DEPTH: usize = 3;
 pub const SIZE: usize = WIDTH * HEIGHT * DEPTH;
 
+#[derive(Debug, Clone, Copy)]
 pub enum GBKey {
     Up, Down, Left,Right, A, B, Start, Select
 }
@@ -71,6 +72,55 @@ impl Gui{
                     Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                         break 'running
                     },
+                    Event::KeyDown {keycode: Some(Keycode::Return), ..} => {
+                        self.tx.send(Message::KeyDown(GBKey::Start)).unwrap();
+                    },
+                    Event::KeyUp {keycode: Some(Keycode::Return), ..} => {
+                        self.tx.send(Message::KeyUp(GBKey::Start)).unwrap();
+                    },
+                    Event::KeyDown {keycode: Some(Keycode::Backspace), ..} => {
+                        self.tx.send(Message::KeyDown(GBKey::Select)).unwrap();
+                    },
+                    Event::KeyUp {keycode: Some(Keycode::Backspace), ..} => {
+                        self.tx.send(Message::KeyUp(GBKey::Select)).unwrap();
+                    },
+                    Event::KeyDown {keycode: Some(Keycode::Q), ..} => {
+                        self.tx.send(Message::KeyDown(GBKey::B)).unwrap();
+                    },
+                    Event::KeyUp {keycode: Some(Keycode::Q), ..} => {
+                        self.tx.send(Message::KeyUp(GBKey::B)).unwrap();
+                    },
+                    Event::KeyDown {keycode: Some(Keycode::S), ..} => {
+                        self.tx.send(Message::KeyDown(GBKey::A)).unwrap();
+                    },
+                    Event::KeyUp {keycode: Some(Keycode::S), ..} => {
+                        self.tx.send(Message::KeyUp(GBKey::A)).unwrap();
+                    },
+                    Event::KeyDown {keycode: Some(Keycode::Left), ..} => {
+                        self.tx.send(Message::KeyDown(GBKey::Left)).unwrap();
+                    },
+                    Event::KeyUp {keycode: Some(Keycode::Left), ..} => {
+                        self.tx.send(Message::KeyUp(GBKey::Left)).unwrap();
+                    }
+                    Event::KeyDown {keycode: Some(Keycode::Right), ..} => {
+                        self.tx.send(Message::KeyDown(GBKey::Right)).unwrap();
+                    },
+                    Event::KeyUp {keycode: Some(Keycode::Right), ..} => {
+                        self.tx.send(Message::KeyUp(GBKey::Right)).unwrap();
+                    },
+                    Event::KeyDown {keycode: Some(Keycode::Up), ..} => {
+                        self.tx.send(Message::KeyDown(GBKey::Up)).unwrap();
+                    },
+                    Event::KeyUp {keycode: Some(Keycode::Up), ..} => {
+                        self.tx.send(Message::KeyUp(GBKey::Up)).unwrap();
+                    },
+                    Event::KeyDown {keycode: Some(Keycode::Down), ..} => {
+                        self.tx.send(Message::KeyDown(GBKey::Down)).unwrap();
+                    },
+                    Event::KeyUp {keycode: Some(Keycode::Down), ..} => {
+                        self.tx.send(Message::KeyUp(GBKey::Down)).unwrap();
+                    }
+
                     _ => {}
                 }
             }
