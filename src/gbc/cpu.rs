@@ -324,9 +324,9 @@ impl Cpu {
             addr
         };
 
-        if self.pc == 0x1944 {
+        /*if self.pc == 0x1944 {
             eprintln!("Breakpoint !");
-        }
+        }*/
 
         let op = bus.read(self.pc);
         match op {
