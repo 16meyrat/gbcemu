@@ -364,7 +364,10 @@ impl Ppu {
                         match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {// horrible hack, this index can be negative but will underflow
                         Some(pixel) => {
                             if !sprite.behind_bg || pixel.palette_index == 0 {
-                                *pixel = palette[tile[tile_x as usize] as usize];
+                                let color = palette[tile[tile_x as usize] as usize];
+                                if color.palette_index != 0 {
+                                    *pixel = color;
+                                }
                             }
                         }
                         _ => {} // do not break, because of the left screen border
@@ -375,7 +378,10 @@ impl Ppu {
                         match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {
                         Some(pixel) => {
                             if !sprite.behind_bg || pixel.palette_index == 0 {
-                                *pixel = palette[tile[7 - tile_x as usize] as usize];
+                                let color = palette[tile[7 - tile_x as usize] as usize];
+                                if color.palette_index != 0 {
+                                    *pixel = color;
+                                }
                             }
                         }
                         _ => {} // do not break, because of the left screen border
