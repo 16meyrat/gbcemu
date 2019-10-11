@@ -398,12 +398,11 @@ impl Ppu {
             ObjSize::Small => 8,
             ObjSize::Big => 16,
         };
-        let y_min = u8::saturating_sub(self.ly, height);
-        let y_max = self.ly;
+        let y_sec = self.ly + 16;
         for i in (0..0xa0).step_by(4) {
             let data = &self.oam[i..i+4];
             let y_sprite = data[0];
-            if y_sprite >= y_min + 16 && y_sprite < y_max + 16 {
+            if y_sprite <= y_sec && y_sec < y_sprite + height {
                 let flags = data[3];
                 res.push(SpriteOam{
                     y: data[0],

@@ -8,6 +8,8 @@ use super::input::Joypad;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use rand;
+
 use crate::gui;
 
 pub struct Bus<'a>{
@@ -45,7 +47,7 @@ impl<'a> Busable for Bus<'a> {
             x if x >= 0xff80 && x <= 0xfffe => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
             0xff00 => {self.joypad.read()} // joypad
-            0xff04 => 0, // timer DIV
+            0xff04 => {rand::random::<u8>()}, // timer DIV
             0xff05 => self.timer.get_tima(),
             0xff06 => self.timer.get_tma(),
             0xff07 => self.timer.get_tac(),

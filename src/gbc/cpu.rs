@@ -56,7 +56,7 @@ impl Cpu {
         self.e = 0;
         self.h = 0;
         self.l = 0;
-        self.pc = 0;
+        self.pc = 0x100;
         self.sp = 0xfff4;
         
         self.zerof = 0;
@@ -1497,6 +1497,10 @@ impl Cpu {
                 self.add_subf = 0;
                 self.carryf = 1;
                 disasm!("SCF");
+            }
+            0x76 => { // HALT
+                self.wait = 4;
+               // self.pc -= 1;
             }
             0x27 => {
                 self.wait = 4;
