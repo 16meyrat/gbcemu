@@ -22,7 +22,7 @@ pub struct Cpu {
 
 const ZERO : u8 = 7;
 const ADDSUB : u8 = 6;
-const HALFCARRY : u8 = 6;
+const HALFCARRY : u8 = 5;
 const CARRY : u8 = 4;
 
 impl Cpu {
@@ -325,7 +325,7 @@ impl Cpu {
         };
 
         if self.pc == 0xc0aa {
-            eprintln!("Breakpoint !");
+            //eprintln!("Breakpoint !");
         }
 
         let op = bus.read(self.pc);
@@ -816,13 +816,14 @@ impl Cpu {
             0xf8 => {
                 let r8 = bus.read(self.pc + 1);
                 let addr = u16::wrapping_add(r8 as i8 as i16 as u16, self.sp);
-                self.a = bus.read(addr);
                 let (_, overflow) = u8::overflowing_add(r8, (self.sp & 0xff) as u8);
                 self.carryf = if overflow {1} else {0};
-                self.half_carryf = if ((r8 as u16) & 0xF + (self.sp & 0xF)) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if (((r8 as u16) & 0xF) + (self.sp & 0xF)) & 0x10 != 0 {1} else {0};
                 self.zerof = 0;
                 self.add_subf = 0;
-                disasm!("LDH A, (a8)");
+                self.h = (addr >> 8) as u8;
+                self.l = addr as u8;
+                disasm!("LD HL, SP+(a8):{:#x} => {:#x}", r8, addr);
                 self.wait = 12;
                 self.pc += 1;
             }
@@ -1442,7 +1443,7 @@ impl Cpu {
                 let r8 = bus.read(self.pc + 1);
                 disasm!("ADD SP, r8:{:#x}", r8);
                 self.pc += 1;
-                let (new_sp, carry) = u16::overflowing_add(self.sp, r8 as i8 as u16);
+                let (new_sp, carry) = u16::overflowing_add(self.sp, r8 as i8 as i16 as u16);
                 self.zerof = 0;
                 self.add_subf = 0;
                 self.half_carryf = 0; // TODO: not true

@@ -275,7 +275,7 @@ impl Ppu {
                 if self.ly < 154 {
                     self.wait = 456;
                     self.ly += 1;
-                    res = PpuInterrupt::None;
+                    //res = PpuInterrupt::VBlank;
                 } else {
                     self.ly = 0;
                     self.wait = 80;
