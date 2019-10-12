@@ -170,11 +170,10 @@ impl Cpu {
 
         macro_rules! addA {
             ($arg:ident) => ({
-                let before = self.a;
                 let (new_a, carry) = u8::overflowing_add(self.$arg, self.a);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 0;
-                self.half_carryf = if ((before & 0xf) + (self.a & 0xf)) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) + (self.$arg & 0xf)) & 0x10 != 0 {1} else {0};
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 4;
@@ -222,7 +221,7 @@ impl Cpu {
                 let (new_a, carry) = u8::overflowing_sub(self.a, self.$arg);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = if self.a & 0xf > (before & 0xf) {0} else {1};
+                self.half_carryf = if self.a & 0xf >= before & 0xf {0} else {1};
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 4;
@@ -232,12 +231,11 @@ impl Cpu {
 
         macro_rules! adcA {
             ($arg:ident) => ({
-                let before = self.a;
                 let (new_a, carry) = u8::overflowing_add(self.$arg, self.a);
                 let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
                 self.add_subf = 0;
-                self.half_carryf = if ((before & 0xf) + self.a & 0xf + self.carryf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) + (self.$arg & 0xf) + self.carryf) & 0x10 != 0 {1} else {0};
                 self.carryf = if carry || carry2 {1} else {0};
                 self.a = new_a2;
                 self.wait = 4;
@@ -247,14 +245,13 @@ impl Cpu {
 
         macro_rules! sbcA {
             ($arg:ident) => ({
-                let before = self.$arg;
                 let (new_a, carry) = u8::overflowing_sub(self.a, self.$arg);
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = if self.a & 0xf < (before & 0xf) + self.carryf {1} else {0};
+                self.half_carryf = if self.a & 0xf < (self.$arg & 0xf) + self.carryf {1} else {0};
                 self.carryf = if carry || carry2 {1} else {0};
-                self.a = new_a;
+                self.a = new_a2;
                 self.wait = 4;
                 disasm!("SBC a, {}", stringify!($arg));
             });
@@ -1520,7 +1517,7 @@ impl Cpu {
                 disasm!("HALT");
             }
             0x10 => { // STOP
-                self.wait = i32::max_value();
+                self.wait = 32;
                 eprintln!("STOP");
                 disasm!("STOP");
             }
