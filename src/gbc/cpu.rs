@@ -968,7 +968,7 @@ impl Cpu {
                 let (new_a, carry) = u8::overflowing_add(val, self.a);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 0;
-                self.half_carryf = if ((self.a & 0xf) + val & 0xf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) + (val & 0xf)) & 0x10 != 0 {1} else {0};
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 8;
@@ -978,7 +978,7 @@ impl Cpu {
                 let val = bus.read((self.h as u16) << 8 | self.l as u16);
                 let (new_a, carry) = u8::overflowing_sub(self.a, val);
                 self.zerof = if new_a == 0 {1} else {0};
-                self.add_subf = 0;
+                self.add_subf = 1;
                 self.half_carryf = if (self.a & 0xf) < (val & 0xf) {1} else {0};
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
@@ -991,7 +991,7 @@ impl Cpu {
                 let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
                 self.add_subf = 0;
-                self.half_carryf = if ((self.a & 0xf) + self.a & 0xf + self.carryf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) + (val & 0xf) + self.carryf) & 0x10 != 0 {1} else {0};
                 self.carryf = if carry || carry2 {1} else {0};
                 self.a = new_a2;
                 self.wait = 8;
@@ -1003,9 +1003,9 @@ impl Cpu {
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = if (self.a & 0xf - (val & 0xf) - self.carryf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((self.a & 0xf ) - (val & 0xf) - self.carryf) & 0x10 != 0 {1} else {0};
                 self.carryf = if carry || carry2 {1} else {0};
-                self.a = new_a;
+                self.a = new_a2;
                 self.wait = 8;
                 disasm!("SBC a, (HL)");
             }
