@@ -188,7 +188,7 @@ impl Cpu {
                 let (res, carry) = u16::overflowing_add(hl, $arg);
                 self.add_subf = 0;
                 self.carryf = carry as u8;
-                self.half_carryf = if ((hl >> 8 & 0xf) + ($arg >> 8 & 0xf)) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((hl & 0xfff) + ($arg & 0xfff)) & 0x1000 != 0 {1} else {0};
                 self.h = (res >> 8) as u8;
                 self.l = res as u8;
                 self.wait = 8;
