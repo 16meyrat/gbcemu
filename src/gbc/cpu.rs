@@ -212,7 +212,7 @@ impl Cpu {
                 *$h = bus.read(self.sp);
                 self.sp += 1;
                 self.wait = 12;
-                disasm!("POP {}{}:0x{:x}{:x}", stringify!($h), stringify!($l), $h, $l);
+                disasm!("POP {}{}:0x{:02x}{:02x}", stringify!($h), stringify!($l), $h, $l);
             };
         }
 
@@ -1399,7 +1399,7 @@ impl Cpu {
                     self.wait = 8;
                 }
             }
-            0xd8 => {
+            0xd0 => {
                 if self.carryf == 0 {
                     disasm!("RET NC");
                     self.ret(bus);
@@ -1419,7 +1419,7 @@ impl Cpu {
                     self.wait = 8;
                 }
             }
-            0xd0 => {
+            0xd8 => {
                 if self.carryf != 0 {
                     disasm!("RET C");
                     self.ret(bus);

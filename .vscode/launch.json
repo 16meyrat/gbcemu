@@ -20,7 +20,7 @@
                 }
             },
             "args": [
-                "individual/03-sphl.gb"
+                "individual/07-jr,jp,call,ret,rst.gb"
             ],
             "cwd": "${workspaceFolder}"
         },
