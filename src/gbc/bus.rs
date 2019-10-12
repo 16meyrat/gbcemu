@@ -64,6 +64,7 @@ impl<'a> Busable for Bus<'a> {
             0xff47 => self.ppu.get_bgp(),
             0xff48 => self.ppu.get_obp0(),
             0xff49 => self.ppu.get_obp1(),
+            0xff68 => 0, // cgb palette
             0xff7f => 0, //empty
             0xff01 => 0, // serial
             0xff02 => 0, // serial
@@ -103,6 +104,11 @@ impl<'a> Busable for Bus<'a> {
             0xff47 => self.ppu.set_bgp(value),
             0xff48 => self.ppu.set_obp0(value),
             0xff49 => self.ppu.set_obp1(value),
+            0xff68 => {}, // cgb palette
+            0xff69 => {}, // cgb palette
+            0xff6a => {}, // cgb palette
+            0xff6b => {}, // cgb palette
+            0xff4f => {}, // cgb bank
             0xff7f => {}, //empty
             0xff01 => {}, // serial
             0xff02 => {}, // serial
