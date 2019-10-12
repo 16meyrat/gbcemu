@@ -35,7 +35,7 @@ impl Cpu {
             e: 0,
             h: 0,
             l: 0,
-            pc: 0,
+            pc: 0x100,
             sp: 0xfffe,
             
             zerof: 0,
@@ -57,7 +57,7 @@ impl Cpu {
         self.h = 0;
         self.l = 0;
         self.pc = 0x100;
-        self.sp = 0xfff4;
+        self.sp = 0xfffe;
         
         self.zerof = 0;
         self.add_subf = 0;
@@ -71,10 +71,10 @@ impl Cpu {
     }
 
     fn set_flags(& mut self, f: u8) {
-        self.zerof = f & 1 << ZERO;
-        self.add_subf = f & 1 << ADDSUB;
-        self.half_carryf = f & 1 << HALFCARRY;
-        self.carryf = f & 1 << CARRY;
+        self.zerof = f >> ZERO & 1;
+        self.add_subf = f >> ADDSUB & 1;
+        self.half_carryf = f >> HALFCARRY & 1;
+        self.carryf = f >> CARRY & 1;
     }
 
     fn call(& mut self, bus: &mut Bus, addr: u16,){
@@ -324,9 +324,9 @@ impl Cpu {
             addr
         };
 
-        /*if self.pc == 0x1944 {
+        if self.pc == 0xc0aa {
             eprintln!("Breakpoint !");
-        }*/
+        }
 
         let op = bus.read(self.pc);
         match op {
@@ -357,7 +357,7 @@ impl Cpu {
             }
             0x31 => {
                 self.sp = bus.read(self.pc+1) as u16 | (bus.read(self.pc+2) as u16) << 8;
-                disasm!("LD HL, 0x{:x}", self.sp);
+                disasm!("LD SP, 0x{:x}", self.sp);
                 self.wait = 12;
                 self.pc += 2;
             }
@@ -1064,7 +1064,7 @@ impl Cpu {
                 let (new_a, carry) = u8::overflowing_add(arg, self.a);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 0;
-                self.half_carryf = if ((arg & 0xf) + self.a & 0xf) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((arg & 0xf) + (self.a & 0xf)) & 0x10 != 0 {1} else {0};
                 self.carryf = if carry {1} else {0};
                 self.a = new_a;
                 self.wait = 8;
@@ -1334,17 +1334,18 @@ impl Cpu {
             }
             0xc4 => {
                 let addr = bus.read16(self.pc + 1);
+                self.pc += 2;
                 if self.zerof == 0 {
                     disasm!("CALL NZ, {:#x}", addr);
                     self.call(bus, addr);
                 }else{
                     self.wait = 12;
                     disasm!("CALL NZ, <no_jump>");
-                    self.pc += 2;
                 }
             }
             0xd4 => {
                 let addr = bus.read16(self.pc + 1);
+                self.pc += 2;
                 if self.carryf == 0 {
                     disasm!("CALL NC, {:#x}", addr);
                     self.call(bus, addr);
@@ -1352,11 +1353,11 @@ impl Cpu {
                 }else{
                     self.wait = 12;
                     disasm!("CALL NC, <no_jump>");
-                    self.pc += 2;
                 }
             }
             0xcc => {
                 let addr = bus.read16(self.pc + 1);
+                self.pc += 2;
                 if self.zerof != 0 {
                     disasm!("CALL Z, {:#x}", addr);
                     self.call(bus, addr);
@@ -1364,7 +1365,6 @@ impl Cpu {
                 }else{
                     self.wait = 12;
                     disasm!("CALL Z, <no_jump>");
-                    self.pc += 2;
                 }
             }
             0xdc => {
@@ -1377,7 +1377,6 @@ impl Cpu {
                 }else{
                     self.wait = 12;
                     disasm!("CALL C, <no_jump>");
-                    self.pc += 2;
                 }
             }
             0xc9 => {
@@ -1438,6 +1437,17 @@ impl Cpu {
                 self.wait = 4;
                 self.interrupts_enabled = true;
                 disasm!("EI");
+            }
+            0xe8 => {
+                let r8 = bus.read(self.pc + 1);
+                disasm!("ADD SP, r8:{:#x}", r8);
+                self.pc += 1;
+                let (new_sp, carry) = u16::overflowing_add(self.sp, r8 as i8 as u16);
+                self.zerof = 0;
+                self.add_subf = 0;
+                self.half_carryf = 0; // TODO: not true
+                self.carryf = carry as u8;
+                self.sp = new_sp;
             }
             0x2f => {
                 self.wait = 4;
@@ -1500,7 +1510,17 @@ impl Cpu {
             }
             0x76 => { // HALT
                 self.wait = 4;
-               // self.pc -= 1;
+                if self.interrupts_enabled {
+                    self.pc -= 1;
+                } else {
+                    self.wait = 8;
+                }
+                disasm!("HALT");
+            }
+            0x10 => { // STOP
+                self.wait = i32::max_value();
+                eprintln!("STOP");
+                disasm!("STOP");
             }
             0x27 => {
                 self.wait = 4;
@@ -1564,7 +1584,7 @@ impl Cpu {
                 eprintln!("Unknown opcode at 0x{:x} : 0x{:x}", self.pc, op);
             }
         };
-        self.pc += 1;
+        self.pc = u16::wrapping_add(self.pc, 1);
     }
 
     fn cb_ext(&mut self, bus: &mut Bus) {

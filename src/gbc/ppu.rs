@@ -65,12 +65,12 @@ impl Ppu {
             wy: 0,
             ly: 0,
             lcy: 0,
-            enabled: false,
+            enabled: true,
             win_enabled: false,
             sprite_enabled: false,
-            bg_win_priority: false,
+            bg_win_priority: true,
             obj_size: ObjSize::Small,
-            win_map_select: WindowMapSelect::Low,
+            win_map_select: WindowMapSelect::High,
             win_bg_data: WindowBGTileData::Low,
             bg_map_select: BgMapSelect::Low,
 
@@ -275,7 +275,7 @@ impl Ppu {
                 if self.ly < 154 {
                     self.wait = 456;
                     self.ly += 1;
-                    res = PpuInterrupt::VBlank;
+                    res = PpuInterrupt::None;
                 } else {
                     self.ly = 0;
                     self.wait = 80;
@@ -295,9 +295,9 @@ impl Ppu {
             if self.win_enabled {
                 self.render_window();
             }
-            if self.sprite_enabled {
-                self.render_sprites();
-            }
+        }
+        if self.sprite_enabled {
+            self.render_sprites();
         }
     }
 

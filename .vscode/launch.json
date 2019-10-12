@@ -19,7 +19,9 @@
                     "kind": "bin"
                 }
             },
-            "args": [],
+            "args": [
+                "individual/03-sphl.gb"
+            ],
             "cwd": "${workspaceFolder}"
         },
         {

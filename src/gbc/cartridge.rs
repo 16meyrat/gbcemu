@@ -55,7 +55,7 @@ impl Cartridge for NRom {
     }
     fn write(&mut self, addr: u16, val: u8){
         match addr {
-            x if x >= 0xa000 && x < 0xa000  => {
+            x if x >= 0xa000 && x < 0xc000  => {
                 let index = addr as usize - 0xa000;
                 if index < self.ram.len() {
                     self.ram[index] = val;
@@ -102,8 +102,8 @@ impl MBC1 {
             rom_selected: true,
         };
         let mut i = 0;
-        for chunk in rom_data.chunks_exact(0x4000) {
-            res.banks[i].copy_from_slice(chunk);
+        for chunk in rom_data.chunks(0x4000) {
+            res.banks[i][..chunk.len()].copy_from_slice(chunk);
             i += 1;
             if i & 0x1f == 0 {
                 i += 1;
@@ -133,7 +133,7 @@ impl Cartridge for MBC1 {
     }
     fn write(&mut self, addr: u16, val: u8){
         match addr {
-            x if x >= 0xa000 && x < 0xa000  => {
+            x if x >= 0xa000 && x < 0xc000  => {
                 let index = addr as usize - 0xa000;
                 let ram_bank = self.get_ram_bank();
                 if index < self.ram[ram_bank].len() {
@@ -144,7 +144,7 @@ impl Cartridge for MBC1 {
                 // ram enable / disable
             }
             x if x < 0x4000 => {
-                let value = if val == 0 {1} else {0}; // "bug" of MBC1
+                let value = if val == 0 {1} else {val}; // "bug" of MBC1
                 self.lower_selection = value & 0x1f;
             }
             x if x < 0x6000 => {
