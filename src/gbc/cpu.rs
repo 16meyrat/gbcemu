@@ -1443,11 +1443,12 @@ impl Cpu {
                 let r8 = bus.read(self.pc + 1);
                 disasm!("ADD SP, r8:{:#x}", r8);
                 self.pc += 1;
-                let (new_sp, carry) = u16::overflowing_add(self.sp, r8 as i8 as i16 as u16);
+                let new_sp = u16::wrapping_add(self.sp, r8 as i8 as i16 as u16);
                 self.zerof = 0;
                 self.add_subf = 0;
-                self.half_carryf = 0; // TODO: not true
+                let (_, carry) = u8::overflowing_add(self.sp as u8, r8);
                 self.carryf = carry as u8;
+                self.half_carryf = if ((self.sp & 0xf) as u8 + (r8 & 0xf)) & 0x10 != 0 {1} else {0};
                 self.sp = new_sp;
             }
             0x2f => {
