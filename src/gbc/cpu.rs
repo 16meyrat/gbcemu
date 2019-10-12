@@ -2010,7 +2010,7 @@ impl Cpu {
 
     fn rlc(&mut self, val: u8) -> u8 {
         let res = u8::rotate_left(val, 1);
-        self.carryf = (res >> 7 & 1) as u8;
+        self.carryf = (res & 1) as u8;
         self.zerof = if res != 0 {0} else {1};
         self.half_carryf = 0;
         self.add_subf = 0;
@@ -2018,7 +2018,7 @@ impl Cpu {
     }
     fn rrc(&mut self, val: u8) -> u8 {
         let res = u8::rotate_right(val, 1);
-        self.carryf = (res & 1) as u8;
+        self.carryf = (res >> 7 & 1) as u8;
         self.zerof = if res != 0 {0} else {1};
         self.half_carryf = 0;
         self.add_subf = 0;
@@ -2028,7 +2028,7 @@ impl Cpu {
         let mut res = (val as u16) << 1;
         res |= self.carryf as u16;
         self.carryf = (res >> 8 & 1) as u8;
-        self.zerof = if res != 0 {0} else {1};
+        self.zerof = if res as u8 != 0 {0} else {1};
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2038,7 +2038,7 @@ impl Cpu {
         res |= (self.carryf as u16) << 15;
         res >>= 8;
         self.carryf = (val & 1) as u8;
-        self.zerof = if res != 0 {0} else {1};
+        self.zerof = if res as u8 != 0 {0} else {1};
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
