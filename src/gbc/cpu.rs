@@ -301,8 +301,8 @@ impl Cpu {
                 let (new_a, carry) = u8::overflowing_sub(self.a, $arg);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = if $arg & 0xf > (self.a & 0xf) {0} else {1};
-                self.carryf = if carry {1} else {0};
+                self.half_carryf = if $arg & 0xf > (self.a & 0xf) {1} else {0};
+                self.carryf = carry as u8;
                 self.wait = 4;
                 disasm!("Cmp A, {}:{:#x}", stringify!($arg), $arg);
             });
@@ -1077,8 +1077,8 @@ impl Cpu {
                 let (new_a, carry) = u8::overflowing_sub(self.a, arg);
                 self.zerof = if new_a == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = if self.a & 0xf > (arg & 0xf) {0} else {1};
-                self.carryf = if carry {1} else {0};
+                self.half_carryf = if self.a & 0xf >= arg & 0xf {0} else {1};
+                self.carryf = carry as u8;
                 self.a = new_a;
                 self.wait = 8;
                 self.pc += 1;
@@ -1103,9 +1103,9 @@ impl Cpu {
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
                 self.zerof = if new_a2 == 0 {1} else {0};
                 self.add_subf = 1;
-                self.half_carryf = ((self.a & 0xf) + self.carryf < (arg & 0xf)) as u8;
+                self.half_carryf = ((self.a & 0xf) < (arg & 0xf) + self.carryf) as u8;
                 self.carryf = if carry || carry2 {1} else {0};
-                self.a = new_a;
+                self.a = new_a2;
                 self.wait = 8;
                 self.pc += 1;
                 disasm!("Sbc a, {:#}", arg);
