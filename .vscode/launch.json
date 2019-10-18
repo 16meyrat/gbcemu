@@ -20,7 +20,7 @@
                 }
             },
             "args": [
-                "individual/07-jr,jp,call,ret,rst.gb"
+                "crystal.gb"
             ],
             "cwd": "${workspaceFolder}"
         },

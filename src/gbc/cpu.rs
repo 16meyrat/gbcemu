@@ -18,6 +18,7 @@ pub struct Cpu {
 
     wait: i32,
     interrupts_enabled: bool,
+    halted: bool,
 }
 
 const ZERO : u8 = 7;
@@ -45,6 +46,7 @@ impl Cpu {
 
             wait: 0,
             interrupts_enabled: false,
+            halted: false,
         }
     }
 
@@ -97,6 +99,11 @@ impl Cpu {
         self.wait -= 1;
         if self.wait > 0 {
             return;
+        }
+
+        if self.halted && self.interrupts_enabled && bus.requested_interrupts != 0{
+            self.pc += 1;
+            self.halted = false;
         }
 
         if self.interrupts_enabled && (bus.enabled_interrupts & bus.requested_interrupts != 0){
@@ -321,7 +328,7 @@ impl Cpu {
             addr
         };
 
-        if self.pc == 0xc0aa {
+        if self.pc == 0x2405 {
             //eprintln!("Breakpoint !");
         }
 
@@ -1509,12 +1516,13 @@ impl Cpu {
             }
             0x76 => { // HALT
                 self.wait = 4;
+                self.halted = true;
+                disasm!("HALT");
                 if self.interrupts_enabled {
                     self.pc -= 1;
                 } else {
                     self.wait = 8;
                 }
-                disasm!("HALT");
             }
             0x10 => { // STOP
                 self.wait = 32;
