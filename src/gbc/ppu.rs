@@ -56,9 +56,9 @@ impl Ppu {
     pub fn new(rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>) -> Self {
         
         Ppu{
-            background_palette: (0..4).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
-            obj_palette0: (0..4).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
-            obj_palette1: (0..4).map(|idx|bw_palette(idx as u8)).collect::<ArrayVec<[Color; 4]>>(),
+            background_palette: (0..4).map(|idx|bw_palette(idx as u8, idx)).collect::<ArrayVec<[Color; 4]>>(),
+            obj_palette0: (0..4).map(|idx|bw_palette(idx as u8, idx)).collect::<ArrayVec<[Color; 4]>>(),
+            obj_palette1: (0..4).map(|idx|bw_palette(idx as u8, idx)).collect::<ArrayVec<[Color; 4]>>(),
             scx: 0,
             scy: 0,
             wx: 0,
@@ -99,7 +99,7 @@ impl Ppu {
 
     pub fn set_bgp(&mut self, new_palette: u8) {
         for (i, col) in self.background_palette.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i);
+            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i, i as u8);
         }
     }
 
@@ -109,7 +109,7 @@ impl Ppu {
 
     pub fn set_obp0(&mut self, new_palette: u8) {
         for (i, col) in self.obj_palette0.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i);
+            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i, i as u8);
         }
     }
 
@@ -119,7 +119,7 @@ impl Ppu {
 
     pub fn set_obp1(&mut self, new_palette: u8) {
         for (i, col) in self.obj_palette1.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i);
+            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i, i as u8);
         }
     }
 
@@ -585,12 +585,12 @@ impl Color {
     
 }
 
-fn bw_palette(entry: u8) -> Color {
+fn bw_palette(entry: u8, index: u8) -> Color {
     match entry {
-        3 => Color::from_palette(0, 0, 0, 3),
-        2 => Color::from_palette(50, 50, 50, 2),
-        1 => Color::from_palette(100, 100, 100, 1),
-        0 => Color::from_palette(150, 150, 150, 0),
+        3 => Color::from_palette(0, 0, 0, index),
+        2 => Color::from_palette(50, 50, 50, index),
+        1 => Color::from_palette(100, 100, 100, index),
+        0 => Color::from_palette(150, 150, 150, index),
         x => panic!("Unknown BW color : {}", x),
     }
 }
