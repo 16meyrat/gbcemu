@@ -310,7 +310,7 @@ impl Ppu {
         let y = u8::wrapping_add(self.ly, self.scy);
         let mut x = 0;
         while x < gui::WIDTH {
-            let rel_x = x + self.scx as usize;
+            let rel_x = (x + self.scx as usize) % 256;
             let tile_index = self.vram[self.bg_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
             let tile_data = get_tile(&self, tile_index, y as usize);
             let offset_x = rel_x % 8;
