@@ -354,39 +354,36 @@ impl Ppu {
 
         oam_data.sort_by_key(|sprite|sprite.x);
         for sprite in oam_data.iter().rev() {
-            let y_offset = self.ly + 16 - sprite.y;
-            if y_offset < 8 {
-                let tile = self.get_sprite_tile_line(&sprite);
-                let x = (sprite.x - 8) as isize;
-                let palette = if sprite.palette {self.obj_palette1.clone()} else {self.obj_palette0.clone()};
-                if !sprite.x_flip {
-                    for tile_x in 0..8 {
-                        match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {// horrible hack, this index can be negative but will underflow
-                        Some(pixel) => {
-                            if !sprite.behind_bg || pixel.palette_index == 0 {
-                                let color = palette[tile[tile_x as usize] as usize];
-                                if color.palette_index != 0 {
-                                    *pixel = color;
-                                }
+            let tile = self.get_sprite_tile_line(&sprite);
+            let x = (sprite.x - 8) as isize;
+            let palette = if sprite.palette {self.obj_palette1.clone()} else {self.obj_palette0.clone()};
+            if !sprite.x_flip {
+                for tile_x in 0..8 {
+                    match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {// horrible hack, this index can be negative but will underflow
+                    Some(pixel) => {
+                        if !sprite.behind_bg || pixel.palette_index == 0 {
+                            let color = palette[tile[tile_x as usize] as usize];
+                            if color.palette_index != 0 {
+                                *pixel = color;
                             }
                         }
-                        _ => {} // do not break, because of the left screen border
-                        } 
                     }
-                } else {
-                    for tile_x in 0..8 {
-                        match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {
-                        Some(pixel) => {
-                            if !sprite.behind_bg || pixel.palette_index == 0 {
-                                let color = palette[tile[7 - tile_x as usize] as usize];
-                                if color.palette_index != 0 {
-                                    *pixel = color;
-                                }
+                    _ => {} // do not break, because of the left screen border
+                    } 
+                }
+            } else {
+                for tile_x in 0..8 {
+                    match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {
+                    Some(pixel) => {
+                        if !sprite.behind_bg || pixel.palette_index == 0 {
+                            let color = palette[tile[7 - tile_x as usize] as usize];
+                            if color.palette_index != 0 {
+                                *pixel = color;
                             }
                         }
-                        _ => {} // do not break, because of the left screen border
-                        } 
                     }
+                    _ => {} // do not break, because of the left screen border
+                    } 
                 }
             }
         }
