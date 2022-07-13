@@ -2018,13 +2018,13 @@ impl Cpu {
                 bus.write(hl, self.srl(bus.read(hl)));
                 disasm!("srl (HL)");
             }
-            x if x & 0xc0 == 0x80 & 0xc0 => {
+            x if x & 0xc0 == 0x80 => {
                 sub_match!(x, res);
             }
-            x if x & 0xc0 == 0x40 & 0xc0 => {
+            x if x & 0xc0 == 0x40 => {
                 sub_match!(x, bit);
             }
-            x if x & 0xc0 == 0xC0 & 0xc0 => {
+            x if x & 0xc0 == 0xC0 => {
                 sub_match!(x, set);
             }
             _ => eprintln!("{:#x}: CB not supported : {:#x}", self.pc, op),
@@ -2044,7 +2044,7 @@ impl Cpu {
         let mut res = val >> 1;
         res |= val & 0x80;
         self.carryf = (val & 1) as u8;
-        self.zerof = if res & 0xff != 0 { 0 } else { 1 };
+        self.zerof = if res != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2100,7 +2100,7 @@ impl Cpu {
     fn srl(&mut self, val: u8) -> u8 {
         let res = val >> 1;
         self.carryf = (val & 1) as u8;
-        self.zerof = if res & 0xff != 0 { 0 } else { 1 };
+        self.zerof = if res != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8

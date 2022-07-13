@@ -96,7 +96,7 @@ enum KeyState {
 }
 
 impl KeyState {
-    fn to_bit(&self) -> u8 {
+    fn to_bit(self) -> u8 {
         match self {
             KeyState::Pressed => 0,
             KeyState::Released => 1,

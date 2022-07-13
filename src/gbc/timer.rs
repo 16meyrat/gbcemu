@@ -30,10 +30,10 @@ impl Timer {
 
         if self.tima == 0xff {
             self.tima = self.tma;
-            return true;
+            true
         } else {
             self.tima += 1;
-            return false;
+            false
         }
     }
 

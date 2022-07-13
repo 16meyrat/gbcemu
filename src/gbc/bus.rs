@@ -44,7 +44,7 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xFE00 => self.ram.read(addr - 0x2000),
             x if x < 0xfea0 => self.ppu.read(addr),
             x if x <= 0xfeff => 0,
-            x if x >= 0xff80 && x <= 0xfffe => self.ram.read(addr),
+            x if (0xff80..=0xfffe).contains(&x) => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
             0xff00 => {self.joypad.read()} // joypad
             0xff04 => {rand::random::<u8>()}, // timer DIV
@@ -70,8 +70,8 @@ impl<'a> Busable for Bus<'a> {
             0xff7f => 0, //empty
             0xff01 => 0, // serial
             0xff02 => 0, // serial
-            x if x >= 0xff10 && x < 0xff27 => 0, // sound
-            x if x >= 0xff30 && x < 0xff40 => 0, // sound
+            x if (0xff10..0xff27).contains(&x) => 0, // sound
+            x if (0xff30..0xff40).contains(&x) => 0, // sound
 
             _ => panic!("Illegal read at {:#x}", addr)
         }
@@ -86,7 +86,7 @@ impl<'a> Busable for Bus<'a> {
             x if x < 0xFE00 => self.ram.write(addr - 0x2000, value),
             x if x < 0xfea0 => self.ppu.write(addr, value),
             x if x <= 0xfeff => {},
-            x if x >= 0xff80 && x <= 0xfffe => self.ram.write(addr, value),
+            x if (0xff80..=0xfffe).contains(&x) => self.ram.write(addr, value),
             0xffff => self.enabled_interrupts = value,
             0xff00 => {self.joypad.write(value)}, // joypad
             0xff04 => {}, // timer DIV
@@ -116,8 +116,8 @@ impl<'a> Busable for Bus<'a> {
             0xff7f => {}, //empty
             0xff01 => {}, // serial
             0xff02 => {}, // serial
-            x if x >= 0xff10 && x < 0xff27 => {}, // sound
-            x if x >= 0xff30 && x < 0xff40 => {}, // sound
+            x if (0xff10..0xff27).contains(&x) => {}, // sound
+            x if (0xff30..0xff40).contains(&x) => {}, // sound
             _ => panic!("Illegal write at {:#x}", addr)
         };
     }
@@ -129,7 +129,7 @@ impl<'a> Bus<'a> {
             ppu: Ppu::new(rendering_texure),
             ram: Ram::new(),
             timer: Timer::new(),
-            cartridge: cartridge,
+            cartridge,
             enabled_interrupts: 0x0,
             requested_interrupts: 0x0,
             joypad: Joypad::new(),

@@ -345,7 +345,7 @@ impl Ppu {
             let rel_x = (x + self.scx as usize) % 256;
             let tile_index =
                 self.vram[self.bg_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
-            let tile_data = get_tile(&self, tile_index, y as usize);
+            let tile_data = get_tile(self, tile_index, y as usize);
             let offset_x = rel_x % 8;
             for tile_x in offset_x..8 {
                 match self.texture[self.ly as usize].get_mut(x + tile_x - offset_x) {
@@ -376,7 +376,7 @@ impl Ppu {
             let rel_x = x - self.wx as usize;
             let tile_index =
                 self.vram[self.win_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
-            let tile_data = get_tile(&self, tile_index, y as usize);
+            let tile_data = get_tile(self, tile_index, y as usize);
             for tile_x in 0..8 {
                 match self.texture[self.ly as usize].get_mut(x + tile_x) {
                     Some(pixel) => {
@@ -396,7 +396,7 @@ impl Ppu {
 
         oam_data.sort_by_key(|sprite| sprite.x);
         for sprite in oam_data.iter().rev() {
-            let tile = self.get_sprite_tile_line(&sprite);
+            let tile = self.get_sprite_tile_line(sprite);
             let x = (sprite.x - 8) as isize;
             let palette = if sprite.palette {
                 self.obj_palette1.clone()
@@ -405,32 +405,30 @@ impl Ppu {
             };
             if !sprite.x_flip {
                 for tile_x in 0..8 {
-                    match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {
+                    if let Some(pixel) =
+                        self.texture[self.ly as usize].get_mut((x + tile_x) as usize)
+                    {
                         // horrible hack, this index can be negative but will underflow
-                        Some(pixel) => {
-                            if !sprite.behind_bg || pixel.palette_index == 0 {
-                                let color = palette[tile[tile_x as usize] as usize];
-                                if color.palette_index != 0 {
-                                    *pixel = color;
-                                }
+                        if !sprite.behind_bg || pixel.palette_index == 0 {
+                            let color = palette[tile[tile_x as usize] as usize];
+                            if color.palette_index != 0 {
+                                *pixel = color;
                             }
                         }
-                        _ => {} // do not break, because of the left screen border
-                    }
+                    } // do not break, because of the left screen border
                 }
             } else {
                 for tile_x in 0..8 {
-                    match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {
-                        Some(pixel) => {
-                            if !sprite.behind_bg || pixel.palette_index == 0 {
-                                let color = palette[tile[7 - tile_x as usize] as usize];
-                                if color.palette_index != 0 {
-                                    *pixel = color;
-                                }
+                    if let Some(pixel) =
+                        self.texture[self.ly as usize].get_mut((x + tile_x) as usize)
+                    {
+                        if !sprite.behind_bg || pixel.palette_index == 0 {
+                            let color = palette[tile[7 - tile_x as usize] as usize];
+                            if color.palette_index != 0 {
+                                *pixel = color;
                             }
                         }
-                        _ => {} // do not break, because of the left screen border
-                    }
+                    } // do not break, because of the left screen border
                 }
             }
         }
@@ -470,8 +468,8 @@ impl Ppu {
         let l = self.vram[addr as usize];
         let h = self.vram[addr as usize + 1];
         let mut res = [0u8; 8];
-        for i in 0..8 {
-            res[i] = ((h >> 7 - i & 1u8) << 1) | (l >> 7 - i & 1u8);
+        for (i, x) in res.iter_mut().enumerate() {
+            *x = ((h >> (7 - i) & 1u8) << 1) | ((l >> (7 - i)) & 1u8);
         }
         res
     }
@@ -481,8 +479,8 @@ impl Ppu {
         let l = self.vram[addr];
         let h = self.vram[addr + 1];
         let mut res = [0u8; 8];
-        for i in 0..8 {
-            res[i] = ((h >> 7 - i & 1u8) << 1) | (l >> 7 - i & 1u8);
+        for (i, x) in res.iter_mut().enumerate() {
+            *x = (((h >> (7 - i)) & 1u8) << 1) | ((l >> (7 - i)) & 1u8);
         }
         res
     }
@@ -512,8 +510,8 @@ impl Ppu {
         let l = self.vram[addr];
         let h = self.vram[addr + 1];
         let mut res = [0u8; 8];
-        for i in 0..8 {
-            res[i] = ((h >> 7 - i & 1u8) << 1) | (l >> 7 - i & 1u8);
+        for (i, x) in res.iter_mut().enumerate() {
+            *x = ((h >> (7 - i) & 1u8) << 1) | ((l >> (7 - i)) & 1u8);
         }
         res
     }
