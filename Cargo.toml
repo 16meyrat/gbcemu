@@ -2,12 +2,12 @@
 name = "gbcemu"
 version = "0.1.0"
 authors = ["16meyrat <louis.meyrat@mines-paristech.fr>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-num_enum = "0.4.1"
-sdl2 = "0.32"
-arrayvec = "0.5"
-rand = "0.7"
+num_enum = "0.5.7"
+sdl2 = "0.35"
+arrayvec = "0.7"
+rand = "0.8"

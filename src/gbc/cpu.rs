@@ -10,7 +10,7 @@ pub struct Cpu {
     l: u8,
     pc: u16,
     sp: u16,
-    
+
     zerof: u8,
     add_subf: u8,
     half_carryf: u8,
@@ -21,14 +21,14 @@ pub struct Cpu {
     halted: bool,
 }
 
-const ZERO : u8 = 7;
-const ADDSUB : u8 = 6;
-const HALFCARRY : u8 = 5;
-const CARRY : u8 = 4;
+const ZERO: u8 = 7;
+const ADDSUB: u8 = 6;
+const HALFCARRY: u8 = 5;
+const CARRY: u8 = 4;
 
 impl Cpu {
     pub fn new() -> Self {
-        Cpu{
+        Cpu {
             a: 0,
             b: 0,
             c: 0,
@@ -38,7 +38,7 @@ impl Cpu {
             l: 0,
             pc: 0x100,
             sp: 0xfffe,
-            
+
             zerof: 0,
             add_subf: 0,
             half_carryf: 0,
@@ -60,7 +60,7 @@ impl Cpu {
         self.l = 0;
         self.pc = 0x100;
         self.sp = 0xfffe;
-        
+
         self.zerof = 0;
         self.add_subf = 0;
         self.half_carryf = 0;
@@ -69,24 +69,27 @@ impl Cpu {
     }
 
     fn flags(&self) -> u8 {
-        self.zerof << ZERO | self.add_subf << ADDSUB | self.half_carryf << HALFCARRY | self.carryf << CARRY
+        self.zerof << ZERO
+            | self.add_subf << ADDSUB
+            | self.half_carryf << HALFCARRY
+            | self.carryf << CARRY
     }
 
-    fn set_flags(& mut self, f: u8) {
+    fn set_flags(&mut self, f: u8) {
         self.zerof = f >> ZERO & 1;
         self.add_subf = f >> ADDSUB & 1;
         self.half_carryf = f >> HALFCARRY & 1;
         self.carryf = f >> CARRY & 1;
     }
 
-    fn call(& mut self, bus: &mut Bus, addr: u16,){
+    fn call(&mut self, bus: &mut Bus, addr: u16) {
         bus.write16(self.sp - 2, self.pc + 1);
         self.sp -= 2;
         self.pc = u16::wrapping_sub(addr, 1);
         self.wait = 16;
     }
 
-    fn ret(& mut self, bus: &mut Bus){
+    fn ret(&mut self, bus: &mut Bus) {
         let l = bus.read(self.sp);
         let h = bus.read(self.sp + 1);
         self.sp += 2;
@@ -101,12 +104,12 @@ impl Cpu {
             return;
         }
 
-        if self.halted && self.interrupts_enabled && bus.requested_interrupts != 0{
+        if self.halted && self.interrupts_enabled && bus.requested_interrupts != 0 {
             self.pc += 1;
             self.halted = false;
         }
 
-        if self.interrupts_enabled && (bus.enabled_interrupts & bus.requested_interrupts != 0){
+        if self.interrupts_enabled && (bus.enabled_interrupts & bus.requested_interrupts != 0) {
             let active_interrupts = bus.enabled_interrupts & bus.requested_interrupts;
             self.sp -= 2;
             self.interrupts_enabled = false;
@@ -115,10 +118,10 @@ impl Cpu {
             if active_interrupts & VBLANK != 0 {
                 self.pc = 0x40;
                 bus.requested_interrupts &= !VBLANK;
-            } else if active_interrupts & LCD_STAT != 0{
+            } else if active_interrupts & LCD_STAT != 0 {
                 self.pc = 0x48;
                 bus.requested_interrupts &= !LCD_STAT;
-            } else if active_interrupts & TIMER != 0{
+            } else if active_interrupts & TIMER != 0 {
                 self.pc = 0x50;
                 bus.requested_interrupts &= !TIMER;
             } else if active_interrupts & SERIAL != 0 {
@@ -152,54 +155,72 @@ impl Cpu {
         }
 
         macro_rules! inc {
-            ($arg:ident) => ({
+            ($arg:ident) => {{
                 let before = self.$arg;
                 self.$arg = u8::wrapping_add(self.$arg, 1);
-                self.zerof = if self.$arg == 0 {1} else {0};
+                self.zerof = if self.$arg == 0 { 1 } else { 0 };
                 self.add_subf = 0;
-                self.half_carryf = if ((before & 0xf) + 1) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((before & 0xf) + 1) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
                 self.wait = 4;
                 disasm!("Inc {}", stringify!($arg));
-            });
+            }};
         }
 
         macro_rules! dec {
-            ($arg:ident) => ({
+            ($arg:ident) => {{
                 let before = self.$arg;
                 self.$arg = u8::wrapping_sub(self.$arg, 1);
-                self.zerof = if self.$arg == 0 {1} else {0};
+                self.zerof = if self.$arg == 0 { 1 } else { 0 };
                 self.add_subf = 1;
-                self.half_carryf = if (before & 0xf) == 0 {1} else {0};
+                self.half_carryf = if (before & 0xf) == 0 { 1 } else { 0 };
                 self.wait = 4;
                 disasm!("Dec {}", stringify!($arg));
-            });
+            }};
         }
 
         macro_rules! addA {
-            ($arg:ident) => ({
+            ($arg:ident) => {{
                 let (new_a, carry) = u8::overflowing_add(self.$arg, self.a);
-                self.zerof = if new_a == 0 {1} else {0};
+                self.zerof = if new_a == 0 { 1 } else { 0 };
                 self.add_subf = 0;
-                self.half_carryf = if ((self.a & 0xf) + (self.$arg & 0xf)) & 0x10 != 0 {1} else {0};
-                self.carryf = if carry {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) + (self.$arg & 0xf)) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
+                self.carryf = if carry { 1 } else { 0 };
                 self.a = new_a;
                 self.wait = 4;
                 disasm!("Add a, {}={:#x}", stringify!($arg), self.$arg);
-            });
+            }};
         }
 
         macro_rules! addHL {
-            ($arg:ident) => ({
+            ($arg:ident) => {{
                 let hl = (self.h as u16) << 8 | self.l as u16;
                 let (res, carry) = u16::overflowing_add(hl, $arg);
                 self.add_subf = 0;
                 self.carryf = carry as u8;
-                self.half_carryf = if ((hl & 0xfff) + ($arg & 0xfff)) & 0x1000 != 0 {1} else {0};
+                self.half_carryf = if ((hl & 0xfff) + ($arg & 0xfff)) & 0x1000 != 0 {
+                    1
+                } else {
+                    0
+                };
                 self.h = (res >> 8) as u8;
                 self.l = res as u8;
                 self.wait = 8;
-                disasm!("Add HL:{:#x}, {}:{:#x} => {:#x}", hl, stringify!($arg), $arg, res);
-            });
+                disasm!(
+                    "Add HL:{:#x}, {}:{:#x} => {:#x}",
+                    hl,
+                    stringify!($arg),
+                    $arg,
+                    res
+                );
+            }};
         }
 
         macro_rules! push16 {
@@ -218,118 +239,129 @@ impl Cpu {
                 *$h = bus.read(self.sp);
                 self.sp += 1;
                 self.wait = 12;
-                disasm!("POP {}{}:0x{:02x}{:02x}", stringify!($h), stringify!($l), $h, $l);
+                disasm!(
+                    "POP {}{}:0x{:02x}{:02x}",
+                    stringify!($h),
+                    stringify!($l),
+                    $h,
+                    $l
+                );
             };
         }
 
         macro_rules! subA {
-            ($arg:ident) => ({
+            ($arg:ident) => {{
                 let before = self.$arg;
                 let (new_a, carry) = u8::overflowing_sub(self.a, self.$arg);
-                self.zerof = if new_a == 0 {1} else {0};
+                self.zerof = if new_a == 0 { 1 } else { 0 };
                 self.add_subf = 1;
-                self.half_carryf = if self.a & 0xf >= before & 0xf {0} else {1};
-                self.carryf = if carry {1} else {0};
+                self.half_carryf = if self.a & 0xf >= before & 0xf { 0 } else { 1 };
+                self.carryf = if carry { 1 } else { 0 };
                 self.a = new_a;
                 self.wait = 4;
                 disasm!("Sub a, {}", stringify!($arg));
-            });
+            }};
         }
 
         macro_rules! adcA {
-            ($arg:ident) => ({
+            ($arg:ident) => {{
                 let (new_a, carry) = u8::overflowing_add(self.$arg, self.a);
                 let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
-                self.zerof = if new_a2 == 0 {1} else {0};
+                self.zerof = if new_a2 == 0 { 1 } else { 0 };
                 self.add_subf = 0;
-                self.half_carryf = if ((self.a & 0xf) + (self.$arg & 0xf) + self.carryf) & 0x10 != 0 {1} else {0};
-                self.carryf = if carry || carry2 {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) + (self.$arg & 0xf) + self.carryf) & 0x10 != 0
+                {
+                    1
+                } else {
+                    0
+                };
+                self.carryf = if carry || carry2 { 1 } else { 0 };
                 self.a = new_a2;
                 self.wait = 4;
                 disasm!("Adc a, {}", stringify!($arg));
-            });
+            }};
         }
 
         macro_rules! sbcA {
-            ($arg:ident) => ({
+            ($arg:ident) => {{
                 let (new_a, carry) = u8::overflowing_sub(self.a, self.$arg);
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
-                self.zerof = if new_a2 == 0 {1} else {0};
+                self.zerof = if new_a2 == 0 { 1 } else { 0 };
                 self.add_subf = 1;
-                self.half_carryf = if self.a & 0xf < (self.$arg & 0xf) + self.carryf {1} else {0};
-                self.carryf = if carry || carry2 {1} else {0};
+                self.half_carryf = if self.a & 0xf < (self.$arg & 0xf) + self.carryf {
+                    1
+                } else {
+                    0
+                };
+                self.carryf = if carry || carry2 { 1 } else { 0 };
                 self.a = new_a2;
                 self.wait = 4;
                 disasm!("SBC a, {}", stringify!($arg));
-            });
+            }};
         }
 
         macro_rules! andA {
-            ($arg:expr) => ({
+            ($arg:expr) => {{
                 self.a &= $arg;
-                self.zerof = if self.a != 0 {0} else {1};
+                self.zerof = if self.a != 0 { 0 } else { 1 };
                 self.add_subf = 0;
                 self.half_carryf = 1;
                 self.carryf = 0;
                 self.wait = 4;
                 disasm!("And A, {}", stringify!($arg));
-            });
+            }};
         }
 
         macro_rules! orA {
-            ($arg:expr) => ({
+            ($arg:expr) => {{
                 self.a |= $arg;
-                self.zerof = if self.a == 0 {1} else {0};
+                self.zerof = if self.a == 0 { 1 } else { 0 };
                 self.add_subf = 0;
                 self.half_carryf = 0;
                 self.carryf = 0;
                 self.wait = 4;
                 disasm!("Or A, {}", stringify!($arg));
-            });
+            }};
         }
 
         macro_rules! xorA {
-            ($arg:expr) => ({
+            ($arg:expr) => {{
                 self.a ^= $arg;
-                self.zerof = if self.a == 0 {1} else {0};
+                self.zerof = if self.a == 0 { 1 } else { 0 };
                 self.add_subf = 0;
                 self.half_carryf = 0;
                 self.carryf = 0;
                 self.wait = 4;
                 disasm!("Xor A, {}", stringify!($arg));
-            });
+            }};
         }
 
         macro_rules! cmpA {
-            ($arg:expr) => ({
+            ($arg:expr) => {{
                 let (new_a, carry) = u8::overflowing_sub(self.a, $arg);
-                self.zerof = if new_a == 0 {1} else {0};
+                self.zerof = if new_a == 0 { 1 } else { 0 };
                 self.add_subf = 1;
-                self.half_carryf = if $arg & 0xf > (self.a & 0xf) {1} else {0};
+                self.half_carryf = if $arg & 0xf > (self.a & 0xf) { 1 } else { 0 };
                 self.carryf = carry as u8;
                 self.wait = 4;
                 disasm!("Cmp A, {}:{:#x}", stringify!($arg), $arg);
-            });
+            }};
         }
 
-        fn jump (this: &mut Cpu, bus: &mut Bus) -> u16 {
+        fn jump(this: &mut Cpu, bus: &mut Bus) -> u16 {
             let addr = bus.read16(this.pc + 1);
             this.pc = addr;
             this.wait = 16;
             this.pc = u16::wrapping_sub(this.pc, 1);
             addr
-        };
+        }
 
-        fn jrel (this: &mut Cpu, bus: &mut Bus) -> u8 {
-            let addr = bus.read(this.pc+1);
+        fn jrel(this: &mut Cpu, bus: &mut Bus) -> u8 {
+            let addr = bus.read(this.pc + 1);
             this.pc = u16::wrapping_add(this.pc, addr as i8 as u16);
             this.wait = 12;
             this.pc = u16::wrapping_add(this.pc, 1);
             addr
-        };
-
-        if self.pc == 0x2405 {
-            //eprintln!("Breakpoint !");
         }
 
         let op = bus.read(self.pc);
@@ -339,34 +371,34 @@ impl Cpu {
                 disasm!("NOP");
             }
             0x1 => {
-                self.c = bus.read(self.pc+1);
-                self.b = bus.read(self.pc+2);
+                self.c = bus.read(self.pc + 1);
+                self.b = bus.read(self.pc + 2);
                 disasm!("LD BC, 0x{:x}{:x}", self.b, self.c);
                 self.wait = 12;
                 self.pc += 2;
             }
             0x11 => {
-                self.e = bus.read(self.pc+1);
-                self.d = bus.read(self.pc+2);
+                self.e = bus.read(self.pc + 1);
+                self.d = bus.read(self.pc + 2);
                 disasm!("LD DE, 0x{:x}{:x}", self.d, self.e);
                 self.wait = 12;
                 self.pc += 2;
             }
             0x21 => {
-                self.l = bus.read(self.pc+1);
-                self.h = bus.read(self.pc+2);
+                self.l = bus.read(self.pc + 1);
+                self.h = bus.read(self.pc + 2);
                 disasm!("LD HL, 0x{:x}{:x}", self.h, self.l);
                 self.wait = 12;
                 self.pc += 2;
             }
             0x31 => {
-                self.sp = bus.read(self.pc+1) as u16 | (bus.read(self.pc+2) as u16) << 8;
+                self.sp = bus.read(self.pc + 1) as u16 | (bus.read(self.pc + 2) as u16) << 8;
                 disasm!("LD SP, 0x{:x}", self.sp);
                 self.wait = 12;
                 self.pc += 2;
             }
             0x40 => {
-                self.b = self.b;
+                //self.b = self.b;
                 self.wait = 4;
                 disasm!("LD B, B");
             }
@@ -401,7 +433,7 @@ impl Cpu {
                 disasm!("LD B, D");
             }
             0x52 => {
-                self.d = self.d;
+                //self.d = self.d;
                 self.wait = 4;
                 disasm!("LD D, D");
             }
@@ -436,7 +468,7 @@ impl Cpu {
                 disasm!("LD D, H");
             }
             0x64 => {
-                self.h = self.h;
+                //self.h = self.h;
                 self.wait = 4;
                 disasm!("LD H, H");
             }
@@ -506,7 +538,7 @@ impl Cpu {
                 disasm!("LD A, B");
             }
             0x49 => {
-                self.c = self.c;
+                //self.c = self.c;
                 self.wait = 4;
                 disasm!("LD C, C");
             }
@@ -516,7 +548,7 @@ impl Cpu {
                 disasm!("LD E, C");
             }
             0x69 => {
-                self.l = self.c; 
+                self.l = self.c;
                 self.wait = 4;
                 disasm!("LD L, C");
             }
@@ -551,7 +583,7 @@ impl Cpu {
                 disasm!("LD C, E");
             }
             0x5b => {
-                self.e = self.e;
+                //self.e = self.e;
                 self.wait = 4;
                 disasm!("LD E, E");
             }
@@ -596,7 +628,7 @@ impl Cpu {
                 disasm!("LD E, L");
             }
             0x6d => {
-                self.l = self.l;
+                //self.l = self.l;
                 self.wait = 4;
                 disasm!("LD L, L");
             }
@@ -621,7 +653,7 @@ impl Cpu {
                 disasm!("LD L, (HL)");
             }
             0x7e => {
-                self.a = bus.read((self.h as u16) << 8 | self.l as u16);         
+                self.a = bus.read((self.h as u16) << 8 | self.l as u16);
                 self.wait = 8;
                 disasm!("LD A, (HL)");
             }
@@ -641,7 +673,7 @@ impl Cpu {
                 disasm!("LD L, A");
             }
             0x7f => {
-                self.a = self.a;
+                //self.a = self.a;
                 self.wait = 4;
                 disasm!("LD A, A");
             }
@@ -795,25 +827,25 @@ impl Cpu {
             }
             0xe0 => {
                 let a8 = bus.read(self.pc + 1);
-                bus.write( a8 as u16 | 0xFF00, self.a);
+                bus.write(a8 as u16 | 0xFF00, self.a);
                 disasm!("LDH (a8):0xff{:02x}, A", a8);
                 self.wait = 12;
                 self.pc += 1;
             }
             0xf0 => {
                 let a8 = bus.read(self.pc + 1);
-                self.a = bus.read( a8 as u16 | 0xFF00);
+                self.a = bus.read(a8 as u16 | 0xFF00);
                 disasm!("LDH A, (a8):{:#x}", a8);
                 self.wait = 12;
                 self.pc += 1;
             }
             0xe2 => {
-                bus.write( self.c as u16 | 0xFF00, self.a);
+                bus.write(self.c as u16 | 0xFF00, self.a);
                 disasm!("LDH (C), A");
                 self.wait = 8;
             }
             0xf2 => {
-                self.a = bus.read( self.c as u16 | 0xFF00);
+                self.a = bus.read(self.c as u16 | 0xFF00);
                 self.wait = 8;
                 disasm!("LDH A, (C)");
             }
@@ -821,8 +853,12 @@ impl Cpu {
                 let r8 = bus.read(self.pc + 1);
                 let addr = u16::wrapping_add(r8 as i8 as i16 as u16, self.sp);
                 let (_, overflow) = u8::overflowing_add(r8, (self.sp & 0xff) as u8);
-                self.carryf = if overflow {1} else {0};
-                self.half_carryf = if (((r8 as u16) & 0xF) + (self.sp & 0xF)) & 0x10 != 0 {1} else {0};
+                self.carryf = if overflow { 1 } else { 0 };
+                self.half_carryf = if (((r8 as u16) & 0xF) + (self.sp & 0xF)) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
                 self.zerof = 0;
                 self.add_subf = 0;
                 self.h = (addr >> 8) as u8;
@@ -866,9 +902,9 @@ impl Cpu {
                 let hl = (self.h as u16) << 8 | self.l as u16;
                 let x = bus.read(hl);
                 let res = u8::wrapping_add(x, 1);
-                self.zerof = if res == 0 {1} else {0};
+                self.zerof = if res == 0 { 1 } else { 0 };
                 self.add_subf = 0;
-                self.half_carryf = if ((x & 0xf) + 1) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((x & 0xf) + 1) & 0x10 != 0 { 1 } else { 0 };
                 bus.write(hl, res);
                 disasm!("INC (HL)");
                 self.wait = 12;
@@ -877,9 +913,9 @@ impl Cpu {
                 let hl = (self.h as u16) << 8 | self.l as u16;
                 let x = bus.read(hl);
                 let res = u8::wrapping_sub(x, 1);
-                self.zerof = if res == 0 {1} else {0};
+                self.zerof = if res == 0 { 1 } else { 0 };
                 self.add_subf = 1;
-                self.half_carryf = if (x & 0xf) == 0 {1} else {0};
+                self.half_carryf = if (x & 0xf) == 0 { 1 } else { 0 };
                 bus.write(hl, res);
                 disasm!("DEC (HL)");
                 self.wait = 12;
@@ -973,10 +1009,14 @@ impl Cpu {
             0x86 => {
                 let val = bus.read((self.h as u16) << 8 | self.l as u16);
                 let (new_a, carry) = u8::overflowing_add(val, self.a);
-                self.zerof = if new_a == 0 {1} else {0};
+                self.zerof = if new_a == 0 { 1 } else { 0 };
                 self.add_subf = 0;
-                self.half_carryf = if ((self.a & 0xf) + (val & 0xf)) & 0x10 != 0 {1} else {0};
-                self.carryf = if carry {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) + (val & 0xf)) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
+                self.carryf = if carry { 1 } else { 0 };
                 self.a = new_a;
                 self.wait = 8;
                 disasm!("Add a (HL)");
@@ -984,10 +1024,10 @@ impl Cpu {
             0x96 => {
                 let val = bus.read((self.h as u16) << 8 | self.l as u16);
                 let (new_a, carry) = u8::overflowing_sub(self.a, val);
-                self.zerof = if new_a == 0 {1} else {0};
+                self.zerof = if new_a == 0 { 1 } else { 0 };
                 self.add_subf = 1;
-                self.half_carryf = if (self.a & 0xf) < (val & 0xf) {1} else {0};
-                self.carryf = if carry {1} else {0};
+                self.half_carryf = if (self.a & 0xf) < (val & 0xf) { 1 } else { 0 };
+                self.carryf = if carry { 1 } else { 0 };
                 self.a = new_a;
                 self.wait = 8;
                 disasm!("Sub a (HL)");
@@ -996,10 +1036,14 @@ impl Cpu {
                 let val = bus.read((self.h as u16) << 8 | self.l as u16);
                 let (new_a, carry) = u8::overflowing_add(self.a, val);
                 let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
-                self.zerof = if new_a2 == 0 {1} else {0};
+                self.zerof = if new_a2 == 0 { 1 } else { 0 };
                 self.add_subf = 0;
-                self.half_carryf = if ((self.a & 0xf) + (val & 0xf) + self.carryf) & 0x10 != 0 {1} else {0};
-                self.carryf = if carry || carry2 {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) + (val & 0xf) + self.carryf) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
+                self.carryf = if carry || carry2 { 1 } else { 0 };
                 self.a = new_a2;
                 self.wait = 8;
                 disasm!("Adc a, (HL)");
@@ -1008,10 +1052,14 @@ impl Cpu {
                 let val = bus.read((self.h as u16) << 8 | self.l as u16);
                 let (new_a, carry) = u8::overflowing_sub(self.a, val);
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
-                self.zerof = if new_a2 == 0 {1} else {0};
+                self.zerof = if new_a2 == 0 { 1 } else { 0 };
                 self.add_subf = 1;
-                self.half_carryf = if ((self.a & 0xf ) - (val & 0xf) - self.carryf) & 0x10 != 0 {1} else {0};
-                self.carryf = if carry || carry2 {1} else {0};
+                self.half_carryf = if ((self.a & 0xf) - (val & 0xf) - self.carryf) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
+                self.carryf = if carry || carry2 { 1 } else { 0 };
                 self.a = new_a2;
                 self.wait = 8;
                 disasm!("SBC a, (HL)");
@@ -1065,126 +1113,134 @@ impl Cpu {
                 self.wait = 8;
             }
             0xc6 => {
-                let arg = bus.read(self.pc +1 );
+                let arg = bus.read(self.pc + 1);
                 let (new_a, carry) = u8::overflowing_add(arg, self.a);
-                self.zerof = if new_a == 0 {1} else {0};
+                self.zerof = if new_a == 0 { 1 } else { 0 };
                 self.add_subf = 0;
-                self.half_carryf = if ((arg & 0xf) + (self.a & 0xf)) & 0x10 != 0 {1} else {0};
-                self.carryf = if carry {1} else {0};
+                self.half_carryf = if ((arg & 0xf) + (self.a & 0xf)) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
+                self.carryf = if carry { 1 } else { 0 };
                 self.a = new_a;
                 self.wait = 8;
                 self.pc += 1;
                 disasm!("Add a, {:#x}", arg);
             }
             0xd6 => {
-                let arg = bus.read(self.pc +1 );
+                let arg = bus.read(self.pc + 1);
                 let (new_a, carry) = u8::overflowing_sub(self.a, arg);
-                self.zerof = if new_a == 0 {1} else {0};
+                self.zerof = if new_a == 0 { 1 } else { 0 };
                 self.add_subf = 1;
-                self.half_carryf = if self.a & 0xf >= arg & 0xf {0} else {1};
+                self.half_carryf = if self.a & 0xf >= arg & 0xf { 0 } else { 1 };
                 self.carryf = carry as u8;
                 self.a = new_a;
                 self.wait = 8;
                 self.pc += 1;
                 disasm!("Sub a, {:#}", arg);
-            },
+            }
             0xce => {
-                let arg = bus.read(self.pc +1 );
+                let arg = bus.read(self.pc + 1);
                 let (new_a, carry) = u8::overflowing_add(arg, self.a);
                 let (new_a2, carry2) = u8::overflowing_add(new_a, self.carryf);
-                self.zerof = if new_a2 == 0 {1} else {0};
+                self.zerof = if new_a2 == 0 { 1 } else { 0 };
                 self.add_subf = 0;
-                self.half_carryf = if ((arg & 0xf) + (self.a & 0xf) + self.carryf) & 0x10 != 0 {1} else {0};
-                self.carryf = if carry || carry2 {1} else {0};
+                self.half_carryf = if ((arg & 0xf) + (self.a & 0xf) + self.carryf) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
+                self.carryf = if carry || carry2 { 1 } else { 0 };
                 self.a = new_a2;
                 self.wait = 8;
                 self.pc += 1;
                 disasm!("Adc a, {:#x}", arg);
-            },
+            }
             0xde => {
-                let arg = bus.read(self.pc +1 );
+                let arg = bus.read(self.pc + 1);
                 let (new_a, carry) = u8::overflowing_sub(self.a, arg);
                 let (new_a2, carry2) = u8::overflowing_sub(new_a, self.carryf);
-                self.zerof = if new_a2 == 0 {1} else {0};
+                self.zerof = if new_a2 == 0 { 1 } else { 0 };
                 self.add_subf = 1;
                 self.half_carryf = ((self.a & 0xf) < (arg & 0xf) + self.carryf) as u8;
-                self.carryf = if carry || carry2 {1} else {0};
+                self.carryf = if carry || carry2 { 1 } else { 0 };
                 self.a = new_a2;
                 self.wait = 8;
                 self.pc += 1;
                 disasm!("Sbc a, {:#}", arg);
-            },
+            }
             0xe6 => {
-                let arg8 = bus.read(self.pc +1 );
+                let arg8 = bus.read(self.pc + 1);
                 andA!(arg8);
                 self.pc += 1;
                 self.wait = 8;
-            },
+            }
             0xf6 => {
-                let arg8 = bus.read(self.pc +1 );
+                let arg8 = bus.read(self.pc + 1);
                 orA!(arg8);
                 self.pc += 1;
                 self.wait = 8;
-            },
+            }
             0xee => {
-                let arg8 = bus.read(self.pc +1 );
+                let arg8 = bus.read(self.pc + 1);
                 xorA!(arg8);
                 self.pc += 1;
                 self.wait = 8;
-            },
+            }
             0xfe => {
-                let arg8 = bus.read(self.pc +1 );
+                let arg8 = bus.read(self.pc + 1);
                 cmpA!(arg8);
                 self.pc += 1;
                 self.wait = 8;
-            },
+            }
             0x09 => {
                 let bc = ((self.b as u16) << 8) | self.c as u16;
                 addHL!(bc);
-            },
+            }
             0x19 => {
                 let de = ((self.d as u16) << 8) | self.e as u16;
                 addHL!(de);
-            },
+            }
             0x29 => {
                 let hl = ((self.h as u16) << 8) | self.l as u16;
                 addHL!(hl);
-            },
+            }
             0x39 => {
                 let sp = self.sp;
                 addHL!(sp);
-            },
+            }
             0xc5 => {
                 let bc = ((self.b as u16) << 8) | self.c as u16;
                 push16!(bc);
-            },
+            }
             0xd5 => {
                 let de = ((self.d as u16) << 8) | self.e as u16;
                 push16!(de);
-            },
+            }
             0xe5 => {
                 let hl = ((self.h as u16) << 8) | self.l as u16;
                 push16!(hl);
-            },
+            }
             0xf5 => {
                 let af = ((self.a as u16) << 8) | self.flags() as u16;
                 push16!(af);
-            },
+            }
             0xc1 => {
                 let b = &mut self.b;
                 let c = &mut self.c;
                 pop16!(b, c);
-            },
+            }
             0xd1 => {
                 let d = &mut self.d;
                 let e = &mut self.e;
                 pop16!(d, e);
-            },
+            }
             0xe1 => {
                 let h = &mut self.h;
                 let l = &mut self.l;
                 pop16!(h, l);
-            },
+            }
             0xf1 => {
                 let mut flags = self.flags();
                 {
@@ -1193,18 +1249,18 @@ impl Cpu {
                     pop16!(a, f);
                 }
                 self.set_flags(flags);
-            },
+            }
             0xc3 => {
                 let pc = self.pc;
                 let addr = jump(self, bus);
                 disasm_pc!(pc, "JP {:#x}", addr);
-            },
+            }
             0xc2 => {
                 if self.zerof != 0 {
                     self.wait = 12;
                     disasm!("JP NZ, <no_jump>");
                     self.pc += 2;
-                }else{
+                } else {
                     let pc = self.pc;
                     let addr = jump(self, bus);
                     disasm_pc!(pc, "JP NZ, {:#x}", addr);
@@ -1215,7 +1271,7 @@ impl Cpu {
                     self.wait = 12;
                     disasm!("JP NC, <no_jump>");
                     self.pc += 2;
-                }else{
+                } else {
                     let pc = self.pc;
                     let addr = jump(self, bus);
                     disasm_pc!(pc, "JP NC, {:#x}", addr);
@@ -1226,7 +1282,7 @@ impl Cpu {
                     self.wait = 12;
                     disasm!("JP Z, <no_jump>");
                     self.pc += 2;
-                }else{
+                } else {
                     let pc = self.pc;
                     let addr = jump(self, bus);
                     disasm_pc!(pc, "JP Z, {:#x}", addr);
@@ -1237,7 +1293,7 @@ impl Cpu {
                     self.wait = 12;
                     disasm!("JP C, <no_jump>");
                     self.pc += 2;
-                }else{
+                } else {
                     let pc = self.pc;
                     let addr = jump(self, bus);
                     disasm_pc!(pc, "JP C, {:#x}", addr);
@@ -1259,7 +1315,7 @@ impl Cpu {
                     let pc = self.pc;
                     let addr = jrel(self, bus);
                     disasm_pc!(pc, "JR NZ, {:#x}", addr);
-                }else{
+                } else {
                     self.wait = 8;
                     disasm!("JR NZ, <no_jump>");
                     self.pc += 1;
@@ -1270,7 +1326,7 @@ impl Cpu {
                     let pc = self.pc;
                     let addr = jrel(self, bus);
                     disasm_pc!(pc, "JR NC, {:#x}", addr);
-                }else{
+                } else {
                     self.wait = 8;
                     disasm!("JR NC, <no_jump>");
                     self.pc += 1;
@@ -1281,7 +1337,7 @@ impl Cpu {
                     let pc = self.pc;
                     let addr = jrel(self, bus);
                     disasm_pc!(pc, "JR Z, {:#x}", addr);
-                }else{
+                } else {
                     self.wait = 8;
                     disasm!("JR Z, <no_jump>");
                     self.pc += 1;
@@ -1292,7 +1348,7 @@ impl Cpu {
                     let pc = self.pc;
                     let addr = jrel(self, bus);
                     disasm_pc!(pc, "JR C, {:#x}", addr);
-                }else{
+                } else {
                     self.wait = 8;
                     disasm!("JR C, <no_jump>");
                     self.pc += 1;
@@ -1343,7 +1399,7 @@ impl Cpu {
                 if self.zerof == 0 {
                     disasm!("CALL NZ, {:#x}", addr);
                     self.call(bus, addr);
-                }else{
+                } else {
                     self.wait = 12;
                     disasm!("CALL NZ, <no_jump>");
                 }
@@ -1355,7 +1411,7 @@ impl Cpu {
                     disasm!("CALL NC, {:#x}", addr);
                     self.call(bus, addr);
                     self.wait = 24;
-                }else{
+                } else {
                     self.wait = 12;
                     disasm!("CALL NC, <no_jump>");
                 }
@@ -1367,7 +1423,7 @@ impl Cpu {
                     disasm!("CALL Z, {:#x}", addr);
                     self.call(bus, addr);
                     self.wait = 24;
-                }else{
+                } else {
                     self.wait = 12;
                     disasm!("CALL Z, <no_jump>");
                 }
@@ -1379,7 +1435,7 @@ impl Cpu {
                     disasm!("CALL C, {:#x}", addr);
                     self.call(bus, addr);
                     self.wait = 24;
-                }else{
+                } else {
                     self.wait = 12;
                     disasm!("CALL C, <no_jump>");
                 }
@@ -1398,7 +1454,7 @@ impl Cpu {
                     disasm!("RET Z");
                     self.ret(bus);
                     self.wait = 20;
-                }else{
+                } else {
                     disasm!("RET Z <no jmp>");
                     self.wait = 8;
                 }
@@ -1408,7 +1464,7 @@ impl Cpu {
                     disasm!("RET NC");
                     self.ret(bus);
                     self.wait = 20;
-                }else{
+                } else {
                     disasm!("RET NC <no jmp>");
                     self.wait = 8;
                 }
@@ -1418,7 +1474,7 @@ impl Cpu {
                     disasm!("RET NZ");
                     self.ret(bus);
                     self.wait = 20;
-                }else{
+                } else {
                     disasm!("RET NZ <no jmp>");
                     self.wait = 8;
                 }
@@ -1428,7 +1484,7 @@ impl Cpu {
                     disasm!("RET C");
                     self.ret(bus);
                     self.wait = 20;
-                }else{
+                } else {
                     disasm!("RET C <no jmp>");
                     self.wait = 8;
                 }
@@ -1452,7 +1508,11 @@ impl Cpu {
                 self.add_subf = 0;
                 let (_, carry) = u8::overflowing_add(self.sp as u8, r8);
                 self.carryf = carry as u8;
-                self.half_carryf = if ((self.sp & 0xf) as u8 + (r8 & 0xf)) & 0x10 != 0 {1} else {0};
+                self.half_carryf = if ((self.sp & 0xf) as u8 + (r8 & 0xf)) & 0x10 != 0 {
+                    1
+                } else {
+                    0
+                };
                 self.sp = new_sp;
             }
             0x2f => {
@@ -1466,7 +1526,7 @@ impl Cpu {
                 self.wait = 4;
                 self.half_carryf = 0;
                 self.add_subf = 0;
-                self.carryf = if self.carryf != 0 {0} else {1};
+                self.carryf = if self.carryf != 0 { 0 } else { 1 };
                 disasm!("CCF");
             }
             0x07 => {
@@ -1504,7 +1564,7 @@ impl Cpu {
                 self.add_subf = 0;
                 let prev_cary = self.carryf;
                 self.carryf = self.a & 1;
-                self.a = self.a >> 1 |  prev_cary << 7;
+                self.a = self.a >> 1 | prev_cary << 7;
                 disasm!("RRA");
             }
             0x37 => {
@@ -1514,7 +1574,8 @@ impl Cpu {
                 self.carryf = 1;
                 disasm!("SCF");
             }
-            0x76 => { // HALT
+            0x76 => {
+                // HALT
                 self.wait = 4;
                 self.halted = true;
                 disasm!("HALT");
@@ -1524,7 +1585,8 @@ impl Cpu {
                     self.wait = 8;
                 }
             }
-            0x10 => { // STOP
+            0x10 => {
+                // STOP
                 self.wait = 32;
                 eprintln!("STOP");
                 disasm!("STOP");
@@ -1534,47 +1596,89 @@ impl Cpu {
                 let h = self.a >> 4;
                 let l = self.a & 0xf;
                 if self.add_subf == 0 {
-                    if self.carryf == 0 && self.half_carryf==0 && h <= 9 && l <=9 {
+                    if self.carryf == 0 && self.half_carryf == 0 && h <= 9 && l <= 9 {
                         self.a = self.a;
                         self.carryf = 0;
-                    } else if self.carryf == 0 && self.half_carryf==0 &&h <= 8 && l >= 0xa && l <= 0xf {
+                    } else if self.carryf == 0
+                        && self.half_carryf == 0
+                        && h <= 8
+                        && l >= 0xa
+                        && l <= 0xf
+                    {
                         self.a = u8::wrapping_add(self.a, 6);
                         self.carryf = 0;
-                    } else if self.carryf == 0 && self.half_carryf==1 &&h <= 9 &&  l <= 0x3 {
+                    } else if self.carryf == 0 && self.half_carryf == 1 && h <= 9 && l <= 0x3 {
                         self.a = u8::wrapping_add(self.a, 6);
                         self.carryf = 0;
-                    } else if self.carryf == 0 && self.half_carryf==0 &&h <= 0xf && h >= 0xa && l <= 0x9 {
-                        self.a = u8::wrapping_add(self.a,0x60);
+                    } else if self.carryf == 0
+                        && self.half_carryf == 0
+                        && h <= 0xf
+                        && h >= 0xa
+                        && l <= 0x9
+                    {
+                        self.a = u8::wrapping_add(self.a, 0x60);
                         self.carryf = 1;
-                    } else if self.carryf == 0 && self.half_carryf==0 &&h >= 0x9 && h <=0xf && l >= 0xa && l <= 0xf {
-                        self.a = u8::wrapping_add(self.a,0x66);
+                    } else if self.carryf == 0
+                        && self.half_carryf == 0
+                        && h >= 0x9
+                        && h <= 0xf
+                        && l >= 0xa
+                        && l <= 0xf
+                    {
+                        self.a = u8::wrapping_add(self.a, 0x66);
                         self.carryf = 1;
-                    } else if self.carryf == 0 && self.half_carryf==1 && h >= 0xa && h <=0xf && l <= 0x3 {
-                        self.a = u8::wrapping_add(self.a,0x66);
+                    } else if self.carryf == 0
+                        && self.half_carryf == 1
+                        && h >= 0xa
+                        && h <= 0xf
+                        && l <= 0x3
+                    {
+                        self.a = u8::wrapping_add(self.a, 0x66);
                         self.carryf = 1;
-                    } else if self.carryf == 1 && self.half_carryf==0 && h <=0x2 && l <= 0x9 {
-                        self.a = u8::wrapping_add(self.a,0x60);
+                    } else if self.carryf == 1 && self.half_carryf == 0 && h <= 0x2 && l <= 0x9 {
+                        self.a = u8::wrapping_add(self.a, 0x60);
                         self.carryf = 1;
-                    } else if self.carryf == 1 && self.half_carryf==0 && h <=0x2 && l >= 0xa && l <= 0xf {
-                        self.a = u8::wrapping_add(self.a,0x66);
+                    } else if self.carryf == 1
+                        && self.half_carryf == 0
+                        && h <= 0x2
+                        && l >= 0xa
+                        && l <= 0xf
+                    {
+                        self.a = u8::wrapping_add(self.a, 0x66);
                         self.carryf = 1;
-                    } else if self.carryf == 1 && self.half_carryf==1 && h <=0x3 && l <= 0x3 {
-                        self.a = u8::wrapping_add(self.a,0x66);
+                    } else if self.carryf == 1 && self.half_carryf == 1 && h <= 0x3 && l <= 0x3 {
+                        self.a = u8::wrapping_add(self.a, 0x66);
                         self.carryf = 1;
                     } else {
                         eprintln!("Bad DAA");
                     }
                 } else {
-                    if self.carryf == 0 && self.half_carryf==0 &&h <= 9 && l <=9 {
+                    if self.carryf == 0 && self.half_carryf == 0 && h <= 9 && l <= 9 {
                         self.a = self.a;
-                    } else if self.carryf == 0 && self.half_carryf==1 && h <=0x8 && l >= 0x6 && l <= 0xf {
-                        self.a = u8::wrapping_add(self.a,0xfa);
+                    } else if self.carryf == 0
+                        && self.half_carryf == 1
+                        && h <= 0x8
+                        && l >= 0x6
+                        && l <= 0xf
+                    {
+                        self.a = u8::wrapping_add(self.a, 0xfa);
                         self.carryf = 0;
-                    } else if self.carryf == 1 && self.half_carryf==0 &&h >= 0x7 && h <=0xf && l <= 0x9 {
-                        self.a = u8::wrapping_add(self.a,0xa0);
+                    } else if self.carryf == 1
+                        && self.half_carryf == 0
+                        && h >= 0x7
+                        && h <= 0xf
+                        && l <= 0x9
+                    {
+                        self.a = u8::wrapping_add(self.a, 0xa0);
                         self.carryf = 1;
-                    } else if self.carryf == 1 && self.half_carryf==1 &&h >= 0x6 && h <=0xf && l >= 0x6 && l <= 0xf {
-                        self.a = u8::wrapping_add(self.a,0x9a);
+                    } else if self.carryf == 1
+                        && self.half_carryf == 1
+                        && h >= 0x6
+                        && h <= 0xf
+                        && l >= 0x6
+                        && l <= 0xf
+                    {
+                        self.a = u8::wrapping_add(self.a, 0x9a);
                         self.carryf = 1;
                     } else {
                         eprintln!("Bad DAA");
@@ -1605,7 +1709,7 @@ impl Cpu {
         }
 
         macro_rules! sub_match {
-            ($opcode:ident, $operation:ident) => (
+            ($opcode:ident, $operation:ident) => {
                 match $opcode & 0x7 {
                     0x00 => {
                         self.wait = 8;
@@ -1648,9 +1752,9 @@ impl Cpu {
                         bus.write(hl, self.$operation(bus.read(hl), ($opcode & 0x38) >> 3));
                         disasm!("{} (HL), {}", stringify!($operation), ($opcode & 0x38) >> 3);
                     }
-                    _ => panic!("Invalid cb submatch {:#x}", $opcode)
+                    _ => panic!("Invalid cb submatch {:#x}", $opcode),
                 }
-            )
+            };
         }
 
         let op = bus.read(self.pc);
@@ -2000,17 +2104,17 @@ impl Cpu {
     fn sla(&mut self, val: u8) -> u8 {
         let res = (val as u16) << 1;
         self.carryf = (res >> 8 & 1) as u8;
-        self.zerof = if res & 0xff != 0 {0} else {1};
+        self.zerof = if res & 0xff != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
     }
 
     fn sra(&mut self, val: u8) -> u8 {
-        let mut res = val  >> 1;
+        let mut res = val >> 1;
         res |= val & 0x80;
         self.carryf = (val & 1) as u8;
-        self.zerof = if res & 0xff != 0 {0} else {1};
+        self.zerof = if res & 0xff != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2019,7 +2123,7 @@ impl Cpu {
     fn rlc(&mut self, val: u8) -> u8 {
         let res = u8::rotate_left(val, 1);
         self.carryf = (res & 1) as u8;
-        self.zerof = if res != 0 {0} else {1};
+        self.zerof = if res != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2027,7 +2131,7 @@ impl Cpu {
     fn rrc(&mut self, val: u8) -> u8 {
         let res = u8::rotate_right(val, 1);
         self.carryf = (res >> 7 & 1) as u8;
-        self.zerof = if res != 0 {0} else {1};
+        self.zerof = if res != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2036,7 +2140,7 @@ impl Cpu {
         let mut res = (val as u16) << 1;
         res |= self.carryf as u16;
         self.carryf = (res >> 8 & 1) as u8;
-        self.zerof = if res as u8 != 0 {0} else {1};
+        self.zerof = if res as u8 != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2046,7 +2150,7 @@ impl Cpu {
         res |= (self.carryf as u16) << 15;
         res >>= 8;
         self.carryf = (val & 1) as u8;
-        self.zerof = if res as u8 != 0 {0} else {1};
+        self.zerof = if res as u8 != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2057,7 +2161,7 @@ impl Cpu {
         let l = val & 0xf;
         let res = l << 4 | h;
         self.carryf = 0;
-        self.zerof = if res != 0 {0} else {1};
+        self.zerof = if res != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2066,7 +2170,7 @@ impl Cpu {
     fn srl(&mut self, val: u8) -> u8 {
         let res = val >> 1;
         self.carryf = (val & 1) as u8;
-        self.zerof = if res & 0xff != 0 {0} else {1};
+        self.zerof = if res & 0xff != 0 { 0 } else { 1 };
         self.half_carryf = 0;
         self.add_subf = 0;
         res as u8
@@ -2083,13 +2187,11 @@ impl Cpu {
     fn bit(&mut self, val: u8, index: u8) -> u8 {
         self.add_subf = 0;
         self.half_carryf = 1;
-        self.zerof = if val >> index & 1 == 0 {1} else {0};
+        self.zerof = if val >> index & 1 == 0 { 1 } else { 0 };
         val
     }
 
     /*
-    let mut hl = (self.h as u16) << 8 | self.l as u16;
-   */
-
+     let mut hl = (self.h as u16) << 8 | self.l as u16;
+    */
 }
-

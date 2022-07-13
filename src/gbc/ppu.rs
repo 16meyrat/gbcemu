@@ -1,18 +1,18 @@
 use super::bus::Busable;
-use num_enum::IntoPrimitive;
 use arrayvec::ArrayVec;
+use num_enum::IntoPrimitive;
 
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 use crate::gui;
 
 pub struct Ppu {
-    background_palette: ArrayVec<[Color; 4]>,
-    obj_palette0: ArrayVec<[Color; 4]>,
-    obj_palette1: ArrayVec<[Color; 4]>,
+    background_palette: ArrayVec<Color, 4>,
+    obj_palette0: ArrayVec<Color, 4>,
+    obj_palette1: ArrayVec<Color, 4>,
     scx: u8,
     scy: u8,
     wx: u8, // real_WX - 7
@@ -54,11 +54,16 @@ pub enum PpuInterrupt {
 
 impl Ppu {
     pub fn new(rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>) -> Self {
-        
-        Ppu{
-            background_palette: (0..4).map(|idx|bw_palette(idx as u8, idx)).collect::<ArrayVec<[Color; 4]>>(),
-            obj_palette0: (0..4).map(|idx|bw_palette(idx as u8, idx)).collect::<ArrayVec<[Color; 4]>>(),
-            obj_palette1: (0..4).map(|idx|bw_palette(idx as u8, idx)).collect::<ArrayVec<[Color; 4]>>(),
+        Ppu {
+            background_palette: (0..4)
+                .map(|idx| bw_palette(idx as u8, idx))
+                .collect::<ArrayVec<Color, 4>>(),
+            obj_palette0: (0..4)
+                .map(|idx| bw_palette(idx as u8, idx))
+                .collect::<ArrayVec<Color, 4>>(),
+            obj_palette1: (0..4)
+                .map(|idx| bw_palette(idx as u8, idx))
+                .collect::<ArrayVec<Color, 4>>(),
             scx: 0,
             scy: 0,
             wx: 0,
@@ -94,32 +99,41 @@ impl Ppu {
     }
 
     pub fn get_bgp(&self) -> u8 {
-        self.background_palette.iter().enumerate().fold(0, |acc, (i, color)|(acc | color.palette_index << 2*i))
+        self.background_palette
+            .iter()
+            .enumerate()
+            .fold(0, |acc, (i, color)| (acc | color.palette_index << (2 * i)))
     }
 
     pub fn set_bgp(&mut self, new_palette: u8) {
         for (i, col) in self.background_palette.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i, i as u8);
+            *col = bw_palette((new_palette & (0x3 << (2 * i))) >> (2 * i), i as u8);
         }
     }
 
     pub fn get_obp0(&self) -> u8 {
-        self.obj_palette0.iter().enumerate().fold(0, |acc, (i, color)|(acc | color.palette_index << 2*i))
+        self.obj_palette0
+            .iter()
+            .enumerate()
+            .fold(0, |acc, (i, color)| (acc | color.palette_index << (2 * i)))
     }
 
     pub fn set_obp0(&mut self, new_palette: u8) {
         for (i, col) in self.obj_palette0.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i, i as u8);
+            *col = bw_palette((new_palette & (0x3 << (2 * i))) >> (2 * i), i as u8);
         }
     }
 
     pub fn get_obp1(&self) -> u8 {
-        self.obj_palette1.iter().enumerate().fold(0, |acc, (i, color)|(acc | color.palette_index << 2*i))
+        self.obj_palette1
+            .iter()
+            .enumerate()
+            .fold(0, |acc, (i, color)| (acc | color.palette_index << (2 * i)))
     }
 
     pub fn set_obp1(&mut self, new_palette: u8) {
         for (i, col) in self.obj_palette1.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << 2*i)) >> 2*i, i as u8);
+            *col = bw_palette((new_palette & (0x3 << (2 * i))) >> (2 * i), i as u8);
         }
     }
 
@@ -172,14 +186,30 @@ impl Ppu {
     }
 
     pub fn get_lcdc(&self) -> u8 {
-        (if self.enabled {0x80} else {0})
-        | (if let WindowMapSelect::High = self.win_map_select {0x40} else {0})
-        | (if self.win_enabled {0x20} else {0})
-        | (if let WindowBGTileData::High = self.win_bg_data {0x10} else {0})
-        | (if let BgMapSelect::High = self.bg_map_select { 0x08} else {0})
-        | (if let ObjSize::Big = self.obj_size {0x04} else {0})
-        | (if self.sprite_enabled {0x02} else {0})
-        | (if self.bg_win_priority {0x01} else {0})
+        (if self.enabled { 0x80 } else { 0 })
+            | (if let WindowMapSelect::High = self.win_map_select {
+                0x40
+            } else {
+                0
+            })
+            | (if self.win_enabled { 0x20 } else { 0 })
+            | (if let WindowBGTileData::High = self.win_bg_data {
+                0x10
+            } else {
+                0
+            })
+            | (if let BgMapSelect::High = self.bg_map_select {
+                0x08
+            } else {
+                0
+            })
+            | (if let ObjSize::Big = self.obj_size {
+                0x04
+            } else {
+                0
+            })
+            | (if self.sprite_enabled { 0x02 } else { 0 })
+            | (if self.bg_win_priority { 0x01 } else { 0 })
     }
 
     pub fn set_lcdc(&mut self, val: u8) {
@@ -189,7 +219,9 @@ impl Ppu {
                 self.current_mode = Mode::OamScan;
             }
             true
-        } else {false};
+        } else {
+            false
+        };
         self.win_map_select = match val & 0x40 {
             0 => WindowMapSelect::Low,
             _ => WindowMapSelect::High,
@@ -203,7 +235,7 @@ impl Ppu {
             0 => BgMapSelect::Low,
             _ => BgMapSelect::High,
         };
-       self.obj_size = match val & 0x04 {
+        self.obj_size = match val & 0x04 {
             0 => ObjSize::Small,
             _ => ObjSize::Big,
         };
@@ -214,11 +246,11 @@ impl Ppu {
     pub fn get_lcds(&self) -> u8 {
         let mode: u8 = self.current_mode.into();
         (self.int_lcy as u8) << 6
-        | (self.int_oam as u8) << 5
-        | (self.int_vblank as u8) << 4
-        | (self.int_hblank as u8) << 3
-        | if self.lcy == self.ly {0x04} else {0}
-        | mode
+            | (self.int_oam as u8) << 5
+            | (self.int_vblank as u8) << 4
+            | (self.int_hblank as u8) << 3
+            | if self.lcy == self.ly { 0x04 } else { 0 }
+            | mode
     }
 
     pub fn set_lcds(&mut self, val: u8) {
@@ -311,14 +343,19 @@ impl Ppu {
         let mut x = 0;
         while x < gui::WIDTH {
             let rel_x = (x + self.scx as usize) % 256;
-            let tile_index = self.vram[self.bg_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
+            let tile_index =
+                self.vram[self.bg_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
             let tile_data = get_tile(&self, tile_index, y as usize);
             let offset_x = rel_x % 8;
             for tile_x in offset_x..8 {
                 match self.texture[self.ly as usize].get_mut(x + tile_x - offset_x) {
-                    Some(pixel) => *pixel = self.background_palette[tile_data[tile_x as usize] as usize],
-                    _ => {return;}
-                } 
+                    Some(pixel) => {
+                        *pixel = self.background_palette[tile_data[tile_x as usize] as usize]
+                    }
+                    _ => {
+                        return;
+                    }
+                }
             }
             x += 8 - offset_x;
         }
@@ -337,13 +374,18 @@ impl Ppu {
         let mut x = self.wx as usize;
         while x < gui::WIDTH {
             let rel_x = x - self.wx as usize;
-            let tile_index = self.vram[self.win_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
+            let tile_index =
+                self.vram[self.win_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
             let tile_data = get_tile(&self, tile_index, y as usize);
             for tile_x in 0..8 {
                 match self.texture[self.ly as usize].get_mut(x + tile_x) {
-                    Some(pixel) => *pixel = self.background_palette[tile_data[tile_x as usize] as usize],
-                    _ => {return;}
-                } 
+                    Some(pixel) => {
+                        *pixel = self.background_palette[tile_data[tile_x as usize] as usize]
+                    }
+                    _ => {
+                        return;
+                    }
+                }
             }
             x += 8;
         }
@@ -352,38 +394,43 @@ impl Ppu {
     fn render_sprites(&mut self) {
         let mut oam_data = self.get_sprites_on_line();
 
-        oam_data.sort_by_key(|sprite|sprite.x);
+        oam_data.sort_by_key(|sprite| sprite.x);
         for sprite in oam_data.iter().rev() {
             let tile = self.get_sprite_tile_line(&sprite);
             let x = (sprite.x - 8) as isize;
-            let palette = if sprite.palette {self.obj_palette1.clone()} else {self.obj_palette0.clone()};
+            let palette = if sprite.palette {
+                self.obj_palette1.clone()
+            } else {
+                self.obj_palette0.clone()
+            };
             if !sprite.x_flip {
                 for tile_x in 0..8 {
-                    match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {// horrible hack, this index can be negative but will underflow
-                    Some(pixel) => {
-                        if !sprite.behind_bg || pixel.palette_index == 0 {
-                            let color = palette[tile[tile_x as usize] as usize];
-                            if color.palette_index != 0 {
-                                *pixel = color;
+                    match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {
+                        // horrible hack, this index can be negative but will underflow
+                        Some(pixel) => {
+                            if !sprite.behind_bg || pixel.palette_index == 0 {
+                                let color = palette[tile[tile_x as usize] as usize];
+                                if color.palette_index != 0 {
+                                    *pixel = color;
+                                }
                             }
                         }
+                        _ => {} // do not break, because of the left screen border
                     }
-                    _ => {} // do not break, because of the left screen border
-                    } 
                 }
             } else {
                 for tile_x in 0..8 {
                     match self.texture[self.ly as usize].get_mut((x + tile_x) as usize) {
-                    Some(pixel) => {
-                        if !sprite.behind_bg || pixel.palette_index == 0 {
-                            let color = palette[tile[7 - tile_x as usize] as usize];
-                            if color.palette_index != 0 {
-                                *pixel = color;
+                        Some(pixel) => {
+                            if !sprite.behind_bg || pixel.palette_index == 0 {
+                                let color = palette[tile[7 - tile_x as usize] as usize];
+                                if color.palette_index != 0 {
+                                    *pixel = color;
+                                }
                             }
                         }
+                        _ => {} // do not break, because of the left screen border
                     }
-                    _ => {} // do not break, because of the left screen border
-                    } 
                 }
             }
         }
@@ -397,11 +444,11 @@ impl Ppu {
         };
         let y_sec = self.ly + 16;
         for i in (0..0xa0).step_by(4) {
-            let data = &self.oam[i..i+4];
+            let data = &self.oam[i..i + 4];
             let y_sprite = data[0];
             if y_sprite <= y_sec && y_sec < y_sprite + height {
                 let flags = data[3];
-                res.push(SpriteOam{
+                res.push(SpriteOam {
                     y: data[0],
                     x: data[1],
                     tile: data[2],
@@ -418,30 +465,30 @@ impl Ppu {
         res
     }
 
-    fn get_tile_line_signed(&self, nb: u8 , y: usize) -> [u8; 8] {
-        let addr = (0x1000 + nb as i8 as isize * 16 ) + y as isize % 8 * 2;
+    fn get_tile_line_signed(&self, nb: u8, y: usize) -> [u8; 8] {
+        let addr = (0x1000 + nb as i8 as isize * 16) + y as isize % 8 * 2;
         let l = self.vram[addr as usize];
         let h = self.vram[addr as usize + 1];
         let mut res = [0u8; 8];
         for i in 0..8 {
-            res[i] = ((h >> 7-i & 1u8) << 1) | ((l >> 7-i & 1u8));
+            res[i] = ((h >> 7 - i & 1u8) << 1) | (l >> 7 - i & 1u8);
         }
         res
     }
 
-    fn get_tile_line_unsigned(&self, nb: u8 , y: usize) -> [u8; 8] {
+    fn get_tile_line_unsigned(&self, nb: u8, y: usize) -> [u8; 8] {
         let addr = nb as usize * 16 + y % 8 * 2;
         let l = self.vram[addr];
         let h = self.vram[addr + 1];
         let mut res = [0u8; 8];
         for i in 0..8 {
-            res[i] = ((h >> 7-i & 1u8) << 1) | ((l >> 7-i & 1u8));
+            res[i] = ((h >> 7 - i & 1u8) << 1) | (l >> 7 - i & 1u8);
         }
         res
     }
 
     fn get_sprite_tile_line(&self, sprite: &SpriteOam) -> [u8; 8] {
-        let mut y_offset = self.ly + 16 - sprite.y ;
+        let mut y_offset = self.ly + 16 - sprite.y;
 
         if sprite.y_flip {
             let sprite_height = match self.obj_size {
@@ -458,15 +505,15 @@ impl Ppu {
                 } else {
                     sprite.tile as usize * 16 + y as usize * 2
                 }
-            },
-            y if y >= 8 => (sprite.tile | 1) as usize * 16 + y as usize % 8 *2, // necessarily ObjSize::Big
-            _ => panic!("Unexpected y offset")
+            }
+            y if y >= 8 => (sprite.tile | 1) as usize * 16 + y as usize % 8 * 2, // necessarily ObjSize::Big
+            _ => panic!("Unexpected y offset"),
         };
         let l = self.vram[addr];
         let h = self.vram[addr + 1];
         let mut res = [0u8; 8];
         for i in 0..8 {
-            res[i] = ((h >> 7-i & 1u8) << 1) | ((l >> 7-i & 1u8));
+            res[i] = ((h >> 7 - i & 1u8) << 1) | (l >> 7 - i & 1u8);
         }
         res
     }
@@ -502,7 +549,7 @@ impl Ppu {
 }
 
 impl Busable for Ppu {
-    fn read(&self, addr: u16) -> u8{
+    fn read(&self, addr: u16) -> u8 {
         if addr < 0xA000 {
             self.vram[(addr - 0x8000) as usize]
         } else if addr < 0xfea0 {
@@ -511,7 +558,7 @@ impl Busable for Ppu {
             panic!("Illegal VRam read : {:#x}", addr)
         }
     }
-    fn write(&mut self, addr: u16, val: u8){
+    fn write(&mut self, addr: u16, val: u8) {
         if addr < 0xA000 {
             self.vram[(addr - 0x8000) as usize] = val;
         } else if addr < 0xfea0 {
@@ -545,7 +592,7 @@ enum BgMapSelect {
 
 enum ObjSize {
     Small,
-    Big
+    Big,
 }
 
 #[derive(Clone, Copy, IntoPrimitive)]
@@ -576,13 +623,22 @@ struct Color {
 }
 
 impl Color {
-    fn new(r: u8, g: u8, b: u8) -> Self{
-        Color{r, g, b, palette_index: 0}
+    fn new(r: u8, g: u8, b: u8) -> Self {
+        Color {
+            r,
+            g,
+            b,
+            palette_index: 0,
+        }
     }
-    fn from_palette(r: u8, g: u8, b: u8, index: u8) -> Self{
-        Color{r, g, b, palette_index: index}
+    fn from_palette(r: u8, g: u8, b: u8, index: u8) -> Self {
+        Color {
+            r,
+            g,
+            b,
+            palette_index: index,
+        }
     }
-    
 }
 
 fn bw_palette(entry: u8, index: u8) -> Color {

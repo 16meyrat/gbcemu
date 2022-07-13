@@ -1,5 +1,4 @@
-use crate::gui::{Message, GBKey};
-
+use crate::gui::{GBKey, Message};
 
 pub struct Joypad {
     key_a: KeyState,
@@ -36,12 +35,12 @@ impl Joypad {
                 let prev_state = self.get_key_state(x);
                 self.set_key_state(x, KeyState::Pressed);
                 prev_state != self.get_key_state(x)
-            },
+            }
             Message::KeyUp(x) => {
                 self.set_key_state(x, KeyState::Released);
                 false
-            },
-            _ => {false}
+            }
+            _ => false,
         }
     }
 
@@ -51,13 +50,19 @@ impl Joypad {
 
     pub fn read(&self) -> u8 {
         if self.show_directions {
-            0x20 | self.key_dw.to_bit() << 3 | self.key_up.to_bit() << 2 | self.key_le.to_bit() << 1 | self.key_ri.to_bit()
+            0x20 | self.key_dw.to_bit() << 3
+                | self.key_up.to_bit() << 2
+                | self.key_le.to_bit() << 1
+                | self.key_ri.to_bit()
         } else {
-            0x10 | self.key_st.to_bit() << 3 | self.key_se.to_bit() << 2 | self.key_b.to_bit() << 1 | self.key_a.to_bit()
+            0x10 | self.key_st.to_bit() << 3
+                | self.key_se.to_bit() << 2
+                | self.key_b.to_bit() << 1
+                | self.key_a.to_bit()
         }
     }
 
-    fn set_key_state(&mut self, key: GBKey ,status : KeyState) {
+    fn set_key_state(&mut self, key: GBKey, status: KeyState) {
         match key {
             GBKey::A => self.key_a = status,
             GBKey::B => self.key_b = status,
@@ -82,7 +87,6 @@ impl Joypad {
             GBKey::Right => self.key_ri,
         }
     }
-
 }
 
 #[derive(Clone, Copy, PartialEq)]

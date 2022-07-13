@@ -1,6 +1,6 @@
 use num_enum::IntoPrimitive;
 
-pub struct Timer{
+pub struct Timer {
     enabled: bool,
     counter: u32,
     tima: u8,
@@ -60,17 +60,18 @@ impl Timer {
             1 => TAC::Clock1,
             2 => TAC::Clock2,
             3 => TAC::Clock3,
-            _ => panic!("Invalid divider")
+            _ => panic!("Invalid divider"),
         }
     }
 
     pub fn get_tac(&self) -> u8 {
-        (self.enabled as u8) << 2 | match self.tac {
-            TAC::Clock0 => 0,
-            TAC::Clock1 => 1,
-            TAC::Clock2 => 2,
-            TAC::Clock3 => 3,
-        }
+        (self.enabled as u8) << 2
+            | match self.tac {
+                TAC::Clock0 => 0,
+                TAC::Clock1 => 1,
+                TAC::Clock2 => 2,
+                TAC::Clock3 => 3,
+            }
     }
 }
 
