@@ -27,6 +27,11 @@ impl Timer {
         }
 
         self.counter = self.tac as u32;
+        // Todo: check time dividors
+        // Todo: what about div ?
+        if !self.enabled {
+            return false;
+        }
 
         if self.tima == 0xff {
             self.tima = self.tma;
@@ -78,8 +83,8 @@ impl Timer {
 #[derive(Clone, Copy, IntoPrimitive)]
 #[repr(u16)]
 enum TAC {
-    Clock0 = 0x1024,
-    Clock1 = 0x16,
-    Clock2 = 0x64,
-    Clock3 = 0x256,
+    Clock0 = 1024,
+    Clock1 = 16,
+    Clock2 = 64,
+    Clock3 = 256,
 }

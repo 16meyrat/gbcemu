@@ -99,16 +99,21 @@ impl Cpu {
     }
 
     #[allow(clippy::collapsible_else_if)]
+    #[allow(unused_parens)]
     pub fn tick(&mut self, bus: &mut Bus) {
         self.wait -= 1;
         if self.wait > 0 {
             return;
         }
 
-        if self.halted && self.interrupts_enabled && bus.requested_interrupts != 0 {
-            self.pc += 1;
-            self.halted = false;
-        }
+        if self.halted{
+            if bus.requested_interrupts != 0 {
+                self.pc += 1;
+                self.halted = false;
+            } else {
+                return;
+            }
+        } 
 
         if self.interrupts_enabled && (bus.enabled_interrupts & bus.requested_interrupts != 0) {
             let active_interrupts = bus.enabled_interrupts & bus.requested_interrupts;
@@ -116,6 +121,7 @@ impl Cpu {
             self.interrupts_enabled = false;
             bus.write16(self.sp, self.pc);
             self.wait = 20;
+            //println!("Interrupt {:x} at pc={:#x}", active_interrupts, self.pc);
             if active_interrupts & VBLANK != 0 {
                 self.pc = 0x40;
                 bus.requested_interrupts &= !VBLANK;
@@ -133,8 +139,6 @@ impl Cpu {
                 bus.requested_interrupts &= !JOYPAD;
             }
             return;
-        } else {
-            bus.requested_interrupts = 0;
         }
 
         macro_rules! disasm {
@@ -309,10 +313,11 @@ impl Cpu {
                 self.half_carryf = 1;
                 self.carryf = 0;
                 self.wait = 4;
-                disasm!("And A, {}", stringify!($arg));
+                disasm!("And A, {}:{:#x}", stringify!($arg), $arg);
             }};
         }
 
+        #[allow(unused_parens)]
         macro_rules! orA {
             ($arg:expr) => {{
                 self.a |= $arg;
@@ -321,7 +326,7 @@ impl Cpu {
                 self.half_carryf = 0;
                 self.carryf = 0;
                 self.wait = 4;
-                disasm!("Or A, {}", stringify!($arg));
+                disasm!("Or A, {}:{:#x}", stringify!($arg), $arg);
             }};
         }
 
@@ -345,7 +350,7 @@ impl Cpu {
                 self.half_carryf = if $arg & 0xf > (self.a & 0xf) { 1 } else { 0 };
                 self.carryf = carry as u8;
                 self.wait = 4;
-                disasm!("Cmp A, {}:{:#x}", stringify!($arg), $arg);
+                disasm!("Cmp A:{:#x}, {}:{:#x}", self.a, stringify!($arg), $arg);
             }};
         }
 
@@ -836,7 +841,7 @@ impl Cpu {
             0xf0 => {
                 let a8 = bus.read(self.pc + 1);
                 self.a = bus.read(a8 as u16 | 0xFF00);
-                disasm!("LDH A, (a8):{:#x}", a8);
+                disasm!("LDH A, (a8):{:#x}=>{:#x}", a8, self.a);
                 self.wait = 12;
                 self.pc += 1;
             }
@@ -1081,12 +1086,12 @@ impl Cpu {
             0xb7 => orA!(self.a),
             0xa6 => {
                 let hl = bus.read((self.h as u16) << 8 | self.l as u16);
-                andA!(hl);
+                andA!((hl));
                 self.wait = 8;
             }
             0xb6 => {
                 let hl = bus.read((self.h as u16) << 8 | self.l as u16);
-                orA!(hl);
+                orA!((hl));
                 self.wait = 8;
             }
             0xa8 => xorA!(self.b),

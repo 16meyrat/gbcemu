@@ -47,7 +47,7 @@ impl<'a> Busable for Bus<'a> {
             x if (0xff80..=0xfffe).contains(&x) => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
             0xff00 => {self.joypad.read()} // joypad
-            0xff04 => {rand::random::<u8>()}, // timer DIV
+            0xff04 => {rand::random::<u8>()}, //todo: timer DIV
             0xff05 => self.timer.get_tima(),
             0xff06 => self.timer.get_tma(),
             0xff07 => self.timer.get_tac(),
