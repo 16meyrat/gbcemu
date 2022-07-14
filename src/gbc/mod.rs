@@ -1,7 +1,7 @@
 pub mod bus;
 pub mod cartridge;
 pub mod cpu;
-
+pub mod sound;
 pub mod input;
 pub mod ppu;
 pub mod timer;
@@ -26,7 +26,7 @@ pub struct Emu {
 impl Emu {
     pub fn new(rom_name: &str) -> Result<Self> {
         let rom = load_rom(rom_name)?;
-        let bus = Bus::new(rom);
+        let bus = Bus::new(rom)?;
         let mut cpu = Cpu::new();
 
         cpu.reset();

@@ -1,6 +1,7 @@
-
+use anyhow::Result;
 use super::ppu::Ppu;
 use super::memory::Ram;
+use super::sound::Sound;
 use super::timer::Timer;
 use super::cartridge::Cartridge;
 use super::input::Joypad;
@@ -13,7 +14,7 @@ pub struct Bus{
     pub enabled_interrupts: u8,
     pub requested_interrupts: u8,
     pub joypad: Joypad,
-
+    pub sound: Sound,
     ram: Ram,
 }
 
@@ -118,16 +119,17 @@ impl Busable for Bus {
 }
 
 impl Bus {
-    pub fn new(cartridge: Box<dyn Cartridge>) -> Self {
-        Bus {
+    pub fn new(cartridge: Box<dyn Cartridge>) -> Result<Self> {
+        Ok(Bus {
             ppu: Ppu::new(),
             ram: Ram::new(),
             timer: Timer::new(),
             cartridge,
             enabled_interrupts: 0x0,
             requested_interrupts: 0x0,
+            sound: Sound::new()?,
             joypad: Joypad::new(),
-        }
+        })
     } 
 
     pub fn write16(&mut self, addr: u16, value: u16){
