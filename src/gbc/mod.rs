@@ -54,14 +54,9 @@ impl Emu {
                 self.bus.requested_interrupts |= bus::TIMER;
             }
             for ev in events {
-                match ev {
-                    Message::WindowClosed => break,
-                    x => {
-                        if self.bus.joypad.update(x) {
-                            self.bus.requested_interrupts |= bus::JOYPAD
-                        }
-                    }
-                }
+                if self.bus.joypad.update(ev) {
+                    self.bus.requested_interrupts |= bus::JOYPAD
+                };
             }
 
             if frame_done {

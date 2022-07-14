@@ -2,11 +2,6 @@ use super::bus::Busable;
 use arrayvec::ArrayVec;
 use num_enum::IntoPrimitive;
 
-
-
-
-use std::time::{Duration, Instant};
-
 use crate::gui;
 
 pub struct Ppu {
@@ -39,8 +34,7 @@ pub struct Ppu {
     oam: [u8; 0xA0],
 
     wait: usize,
-    last_time: Instant,
-    last_sleep: Duration,
+
     texture: Vec<[Color; gui::WIDTH]>,
 }
 
@@ -88,8 +82,6 @@ impl Ppu {
             oam: [0; 0xA0],
 
             wait: 0,
-            last_time: Instant::now(),
-            last_sleep: Duration::from_millis(0),
 
             texture: vec![[Color::new(0, 0, 0); gui::WIDTH]; gui::HEIGHT],
         }
@@ -526,19 +518,6 @@ impl Ppu {
                 }
             }
         }
-
-        // let last_time = self.last_time;
-        // self.last_time = Instant::now();
-        // let elapsed = self.last_time.duration_since(last_time).as_micros();
-        // let sleep = self.last_sleep.as_micros() as i128 + (16_666 - elapsed as i128);
-        // // println!("Fps: {}", 1e6 / elapsed as f64);
-        // if sleep > 0 {
-        //     self.last_sleep = Duration::from_micros(sleep as u64);
-        //     std::thread::sleep(self.last_sleep);
-        // } else {
-        //     self.last_sleep = Duration::from_micros(0);
-        //     std::thread::yield_now();
-        // }
     }
 }
 
