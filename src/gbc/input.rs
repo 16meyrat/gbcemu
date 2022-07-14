@@ -40,7 +40,6 @@ impl Joypad {
                 self.set_key_state(x, KeyState::Released);
                 false
             }
-            _ => false,
         }
     }
 
