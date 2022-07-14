@@ -195,7 +195,7 @@ impl Gui {
             self.last_time = Instant::now();
             let elapsed = self.last_time.duration_since(last_time).as_micros();
             let sleep = self.last_sleep.as_micros() as i128 + (16_666 - elapsed as i128);
-            println!("Fps: {}", 1e6 / elapsed as f64);
+            //println!("Fps: {}", 1e6 / elapsed as f64);
             if sleep > 0 {
                 self.last_sleep = Duration::from_micros(sleep as u64);
                 std::thread::sleep(self.last_sleep);
