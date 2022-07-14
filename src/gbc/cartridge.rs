@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::str;
 use num_enum::TryFromPrimitive;
+use anyhow::{Result, Context, bail};
 use std::convert::TryFrom;
 
 pub trait Cartridge {
@@ -9,35 +10,35 @@ pub trait Cartridge {
     fn write(&mut self, addr: u16, val: u8);
 }
 
-pub fn load_rom(path: &str) -> Box<dyn Cartridge> {
-    let mut rom = Rom::new(path);
+pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
+    let mut rom = Rom::new(path)?;
     println!("Loading {} ...", path);
-    let title = rom.get_title();
+    let title = rom.get_title()?;
     println!("Title: {}", title);
 
     let gbc = rom.is_gbc();
     println!("Game Boy Color mode: {}", gbc);
 
-    println!("External RAM size : {:#x}", rom.get_ram_size());
+    println!("External RAM size : {:#x}", rom.get_ram_size()?);
 
-    println!("ROM size : {}KB", rom.get_rom_size());
+    println!("ROM size : {}KB", rom.get_rom_size()?);
 
-    let mbc_type = rom.get_mbc_type();
+    let mbc_type = rom.get_mbc_type()?;
     let res: Box<dyn Cartridge> = match mbc_type {
         MbcType::NRom => {
             println!("ROM without MBC");
-            Box::new(NRom::new(& mut rom))
+            Box::new(NRom::new(& mut rom)?)
         },
         MbcType::Mbc1 | MbcType::Mbc1Ram | MbcType::Mbc1RamBattery => {
             println!("Mapper is MBC1");
-            Box::new(MBC1::new(&mut rom))
+            Box::new(MBC1::new(&mut rom)?)
         }
         _ => {
             panic!("Unsuported MBC : {:?}", mbc_type);
         },
     };
     println!("Rom loaded !");
-    res
+    Ok(res)
 }
 
 struct NRom {
@@ -67,16 +68,16 @@ impl Cartridge for NRom {
 }
 
 impl NRom {
-    pub fn new(rom: & mut Rom) -> Self {
-        let rom_data = rom.read_range(0, 0x8000);
+    pub fn new(rom: & mut Rom) -> Result<Self> {
+        let rom_data = rom.read_range(0, 0x8000)?;
         let slice = &rom_data[..0x8000];
-        let ram_size = rom.get_ram_size();
+        let ram_size = rom.get_ram_size()?;
         let mut res = NRom{
             banks: [0; 0x8000],
             ram: vec![0; ram_size],
         };
         res.banks.copy_from_slice(slice);
-        res
+        Ok(res)
     }
 }
 
@@ -89,10 +90,10 @@ struct MBC1 {
 }
 
 impl MBC1 {
-    pub fn new(rom: & mut Rom) -> Self {
-        let bank_nb = rom.get_rom_size() / 16;
-        let ram_size = rom.get_ram_size();
-        let rom_data = rom.read_range(0, rom.get_data_len());
+    pub fn new(rom: & mut Rom) -> Result<Self> {
+        let bank_nb = rom.get_rom_size()? / 16;
+        let ram_size = rom.get_ram_size()?;
+        let rom_data = rom.read_range(0, rom.get_data_len())?;
 
         let mut res = MBC1{
             banks: vec![[0; 0x4000]; bank_nb],
@@ -109,7 +110,7 @@ impl MBC1 {
                 i += 1;
             }
         }
-        res
+        Ok(res)
     }
 
     fn get_rom_bank(&self) -> usize {
@@ -187,40 +188,40 @@ struct Rom {
 }
 
 impl Rom {
-    fn new(path: &str) -> Self {
-        let mut file = File::open(path).expect("File not found");
+    fn new(path: &str) -> Result<Self> {
+        let mut file = File::open(path).with_context(||format!("Error opening {path}"))?;
         let mut buf: Vec<u8> = Vec::new();
-        file.read_to_end(& mut buf).expect("IO error");
-        Rom {
+        file.read_to_end(& mut buf)?;
+        Ok(Rom {
             data: buf,
-        }
+        })
     }
 
-    fn get_title(&mut self) -> String {
-        let str_arr = self.read_range(0x134, 0x143);
-        let mut s = str::from_utf8(str_arr).expect("Invalid UTF-8 in game title");
+    fn get_title(&mut self) -> Result<String> {
+        let str_arr = self.read_range(0x134, 0x143)?;
+        let mut s = str::from_utf8(str_arr).context("Invalid UTF-8 in game title")?;
         s = s.trim_matches(char::from(0));
-        s.to_owned()
+        Ok(s.to_owned())
     }
 
     fn is_gbc(&self) -> bool {
         self.data[0x143] & 0x80 != 0
     }
 
-    fn get_ram_size(&self) -> usize {
-        match self.data[0x149] {
+    fn get_ram_size(&self) -> Result<usize> {
+        Ok(match self.data[0x149] {
             0 => 0,
             1 => 0x800,
             2 => 0x2000,
             3 => 0x8000,
             4 => 0x20000,
             5 => 0x10000,
-            x => panic!("Invalid RAM size: {}", x)
-        }
+            x => bail!("Invalid RAM size: {}", x)
+        })
     }
 
-    fn get_rom_size(&self) -> usize {
-        match self.data[0x148] {
+    fn get_rom_size(&self) -> Result<usize> {
+        Ok(match self.data[0x148] {
             0 => 0x20,
             1 => 0x40,
             2 => 0x80,
@@ -233,20 +234,23 @@ impl Rom {
             0x52 => 0x480,
             0x53 => 0x500,
             0x54 => 0x600,
-            x => panic!("Invalid ROM size: {}", x)
-        }
+            x => bail!("Invalid ROM size: {}", x)
+        })
     }
 
-    fn get_mbc_type(&mut self) -> MbcType {
+    fn get_mbc_type(&mut self) -> Result<MbcType> {
         let mbc_code = self.data[0x147];
-        MbcType::try_from(mbc_code).unwrap_or_else(|_| panic!("Unsuported MBC: {:x}", mbc_code))
+        MbcType::try_from(mbc_code).context(format!("Unsuported MBC: {:x}", mbc_code))
     }
 
     fn get_data_len(&self) -> usize {
         self.data.len()
     }
 
-    fn read_range(&self, begin: usize, end: usize) -> &[u8] {
-        &self.data[begin..end]
+    fn read_range(&self, begin: usize, end: usize) -> Result<&[u8]> {
+        if self.data.len() < end {
+            bail!("Load ROM out-of-bound read. Maybe the file is corrupted ?")
+        }
+        Ok(&self.data[begin..end])
     }
 }
