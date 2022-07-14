@@ -43,7 +43,7 @@ impl Emu {
                 PpuInterrupt::None => {}
                 PpuInterrupt::VBlank => {
                     self.bus.requested_interrupts |= bus::VBLANK;
-                    frame_done = false;
+                    frame_done = true;
                 }
                 PpuInterrupt::Stat => {
                     self.bus.requested_interrupts |= bus::LCD_STAT;
