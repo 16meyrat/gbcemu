@@ -25,8 +25,8 @@ pub struct Emu {
 
 impl Emu {
     pub fn new(rom_name: &str) -> Result<Self> {
-        let mut rom = load_rom(rom_name)?;
-        let mut bus = Bus::new(rom);
+        let rom = load_rom(rom_name)?;
+        let bus = Bus::new(rom);
         let mut cpu = Cpu::new();
 
         cpu.reset();

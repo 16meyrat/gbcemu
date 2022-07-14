@@ -5,12 +5,12 @@ use super::timer::Timer;
 use super::cartridge::Cartridge;
 use super::input::Joypad;
 
-use std::sync::Arc;
-use std::sync::Mutex;
+
+
 
 use rand;
 
-use crate::gui;
+
 
 pub struct Bus{
     pub ppu: Ppu,
