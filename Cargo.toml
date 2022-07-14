@@ -10,5 +10,5 @@ edition = "2021"
 num_enum = "0.5.7"
 sdl2 = "0.35"
 arrayvec = "0.7"
-rand = "0.8"
 anyhow = "1"
+cpal = { version = "0.13.5", features = ["jack"] }

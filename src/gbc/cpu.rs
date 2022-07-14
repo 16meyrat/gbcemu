@@ -1594,7 +1594,8 @@ impl Cpu {
             0x10 => {
                 // STOP
                 self.wait = 32;
-                eprintln!("STOP");
+                bus.timer.reset_div();
+                self.halted = true;
                 disasm!("STOP");
             }
             0x27 => {

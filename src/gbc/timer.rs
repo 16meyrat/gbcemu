@@ -3,6 +3,8 @@ use num_enum::IntoPrimitive;
 pub struct Timer {
     enabled: bool,
     counter: u32,
+    div: u8,
+    div_counter: u8,
     tima: u8,
     tma: u8,
     tac: TAC,
@@ -13,6 +15,8 @@ impl Timer {
         Timer {
             enabled: false,
             counter: 0,
+            div_counter: 0,
+            div: 0,
             tima: 0,
             tma: 0,
             tac: TAC::Clock0,
@@ -21,11 +25,17 @@ impl Timer {
 
     // return whether timer interrupt needs to happen
     pub fn tick(&mut self) -> bool {
+        if self.div_counter == 0xff {
+            self.div_counter = 0;
+            self.div = self.div.wrapping_add(1);
+        }else{
+            self.div_counter+=1;
+        }
+
         if self.counter > 0 {
             self.counter -= 1;
             return false;
-        }
-
+        } 
         self.counter = self.tac as u32;
         // Todo: check time dividors
         // Todo: what about div ?
@@ -40,6 +50,7 @@ impl Timer {
             self.tima += 1;
             false
         }
+        
     }
 
     pub fn set_tma(&mut self, tma: u8) {
@@ -56,6 +67,14 @@ impl Timer {
 
     pub fn get_tima(&self) -> u8 {
         self.tima
+    }
+
+    pub fn reset_div(&mut self) {
+        self.div = 0;
+    }
+
+    pub fn get_div(&self) -> u8 {
+        self.div
     }
 
     pub fn set_tac(&mut self, tac: u8) {

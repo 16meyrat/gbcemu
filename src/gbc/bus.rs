@@ -6,12 +6,6 @@ use super::cartridge::Cartridge;
 use super::input::Joypad;
 
 
-
-
-use rand;
-
-
-
 pub struct Bus{
     pub ppu: Ppu,
     pub timer: Timer,
@@ -47,7 +41,7 @@ impl Busable for Bus {
             x if (0xff80..=0xfffe).contains(&x) => self.ram.read(addr),
             0xffff => self.enabled_interrupts,
             0xff00 => {self.joypad.read()} // joypad
-            0xff04 => {rand::random::<u8>()}, //todo: timer DIV
+            0xff04 => self.timer.get_div(),
             0xff05 => self.timer.get_tima(),
             0xff06 => self.timer.get_tma(),
             0xff07 => self.timer.get_tac(),
@@ -89,7 +83,7 @@ impl Busable for Bus {
             x if (0xff80..=0xfffe).contains(&x) => self.ram.write(addr, value),
             0xffff => self.enabled_interrupts = value,
             0xff00 => {self.joypad.write(value)}, // joypad
-            0xff04 => {}, // timer DIV
+            0xff04 => self.timer.reset_div(), 
             0xff05 => self.timer.set_tima(value),
             0xff06 => self.timer.set_tma(value),
             0xff07 => self.timer.set_tac(value),
