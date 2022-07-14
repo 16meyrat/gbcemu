@@ -12,10 +12,10 @@ use rand;
 
 use crate::gui;
 
-pub struct Bus<'a>{
+pub struct Bus{
     pub ppu: Ppu,
     pub timer: Timer,
-    pub cartridge: &'a mut dyn Cartridge,
+    pub cartridge: Box<dyn Cartridge>,
     pub enabled_interrupts: u8,
     pub requested_interrupts: u8,
     pub joypad: Joypad,
@@ -34,7 +34,7 @@ pub const TIMER: u8 = 0x04;
 pub const SERIAL: u8 = 0x08;
 pub const JOYPAD: u8 = 0x10;
 
-impl<'a> Busable for Bus<'a> {
+impl Busable for Bus {
     fn read(&self, addr: u16) -> u8{
         match addr {
             x if x < 0x8000 => self.cartridge.read(addr),
@@ -123,10 +123,10 @@ impl<'a> Busable for Bus<'a> {
     }
 }
 
-impl<'a> Bus<'a> {
-    pub fn new(cartridge: &'a mut dyn Cartridge, rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>) -> Bus<'a> {
+impl Bus {
+    pub fn new(cartridge: Box<dyn Cartridge>) -> Self {
         Bus {
-            ppu: Ppu::new(rendering_texure),
+            ppu: Ppu::new(),
             ram: Ram::new(),
             timer: Timer::new(),
             cartridge,

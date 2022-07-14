@@ -29,8 +29,8 @@ impl Joypad {
         }
     }
 
-    pub fn update(&mut self, msg: Message) -> bool {
-        match msg {
+    pub fn update(&mut self, msg: &Message) -> bool {
+        match *msg {
             Message::KeyDown(x) => {
                 let prev_state = self.get_key_state(x);
                 self.set_key_state(x, KeyState::Pressed);

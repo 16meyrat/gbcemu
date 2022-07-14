@@ -41,8 +41,6 @@ pub struct Ppu {
     wait: usize,
     last_time: Instant,
     last_sleep: Duration,
-
-    rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>,
     texture: Vec<[Color; gui::WIDTH]>,
 }
 
@@ -53,7 +51,7 @@ pub enum PpuInterrupt {
 }
 
 impl Ppu {
-    pub fn new(rendering_texure: Arc<Mutex<[u8; gui::SIZE]>>) -> Self {
+    pub fn new() -> Self {
         Ppu {
             background_palette: (0..4)
                 .map(|idx| bw_palette(idx as u8, idx))
@@ -93,7 +91,6 @@ impl Ppu {
             last_time: Instant::now(),
             last_sleep: Duration::from_millis(0),
 
-            rendering_texure,
             texture: vec![[Color::new(0, 0, 0); gui::WIDTH]; gui::HEIGHT],
         }
     }
@@ -260,7 +257,8 @@ impl Ppu {
         self.int_hblank = val & 0x08 != 0;
     }
 
-    pub fn tick(&mut self) -> PpuInterrupt {
+    pub fn 
+    tick(&mut self) -> PpuInterrupt {
         if !self.enabled {
             return PpuInterrupt::None;
         }
@@ -291,7 +289,6 @@ impl Ppu {
                     res = PpuInterrupt::Stat;
                 }
                 if self.ly >= 144 {
-                    self.render();
                     self.wait = 456;
                     self.current_mode = Mode::VBlank;
                     res = PpuInterrupt::VBlank;
@@ -516,8 +513,7 @@ impl Ppu {
         res
     }
 
-    fn render(&mut self) {
-        let mut target = self.rendering_texure.lock().unwrap();
+    pub fn render(&self, target: &mut [u8; gui::SIZE]) {
         let mut index = 0;
         for y in 0..gui::HEIGHT {
             for x in 0..gui::WIDTH {
@@ -531,18 +527,18 @@ impl Ppu {
             }
         }
 
-        let last_time = self.last_time;
-        self.last_time = Instant::now();
-        let elapsed = self.last_time.duration_since(last_time).as_micros();
-        let sleep = self.last_sleep.as_micros() as i128 + (16_666 - elapsed as i128);
-        // println!("Fps: {}", 1e6 / elapsed as f64);
-        if sleep > 0 {
-            self.last_sleep = Duration::from_micros(sleep as u64);
-            std::thread::sleep(self.last_sleep);
-        } else {
-            self.last_sleep = Duration::from_micros(0);
-            std::thread::yield_now();
-        }
+        // let last_time = self.last_time;
+        // self.last_time = Instant::now();
+        // let elapsed = self.last_time.duration_since(last_time).as_micros();
+        // let sleep = self.last_sleep.as_micros() as i128 + (16_666 - elapsed as i128);
+        // // println!("Fps: {}", 1e6 / elapsed as f64);
+        // if sleep > 0 {
+        //     self.last_sleep = Duration::from_micros(sleep as u64);
+        //     std::thread::sleep(self.last_sleep);
+        // } else {
+        //     self.last_sleep = Duration::from_micros(0);
+        //     std::thread::yield_now();
+        // }
     }
 }
 
