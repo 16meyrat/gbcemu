@@ -262,8 +262,8 @@ impl Synth {
         if self.reg_state.sound_length_2 != new_state.sound_length_2{
             self.sound_length_2 = new_state.sound_length_2;
         }
-        self.hz_frequency_1 = 131072/(2048-(new_state.frequency_1 as u32));
-        self.hz_frequency_2 = 131072/(2048-(new_state.frequency_2 as u32));
+        self.hz_frequency_1 = (131072./(2048.-(new_state.frequency_1 as f32)).round()) as u32;
+        self.hz_frequency_2 = (131072./(2048.-(new_state.frequency_2 as f32)).round()) as u32;
         self.reg_state = new_state;
     }
 
