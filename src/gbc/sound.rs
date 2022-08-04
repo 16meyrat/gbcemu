@@ -226,7 +226,9 @@ struct Synth {
     timer_512: u32,
     length_timer: u8,
 
+    hz_frequency_1: u32,
     sound_length_1: u8,
+    hz_frequency_2: u32,
     sound_length_2: u8,
 }
 
@@ -241,7 +243,9 @@ impl Synth {
             timer_512_reset: (sample_rate / 512) as u32,
             timer_512: 0,
             length_timer: 0,
+            hz_frequency_1: 0,
             sound_length_1: 0,
+            hz_frequency_2: 0,
             sound_length_2: 0,
         }
     }
@@ -257,6 +261,8 @@ impl Synth {
         if self.reg_state.sound_length_2 != new_state.sound_length_2{
             self.sound_length_2 = new_state.sound_length_2;
         }
+        self.hz_frequency_1 = 131072/(2048-(new_state.frequency_1 as u32));
+        self.hz_frequency_2 = 131072/(2048-(new_state.frequency_2 as u32));
         self.reg_state = new_state;
     }
 
@@ -308,7 +314,7 @@ impl Synth {
         if self.sound_length_1 == 0 {
             return 0.;
         }
-        let freq =0u64.checked_add(self.reg_state.frequency_1 as u64).expect("Underflow");
+        let freq = self.hz_frequency_1 as u64;
         let normalized = (self.n * freq) % self.sample_rate;
         let cycle_index = ((normalized as f32) / (self.sample_rate as f32) * 8.) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_1 as usize][cycle_index]
@@ -324,7 +330,7 @@ impl Synth {
         if self.sound_length_2 == 0 {
             return 0.;
         }
-        let freq = 0u64.checked_add(self.reg_state.frequency_2 as u64).expect("Underflow");
+        let freq =self.hz_frequency_2 as u64;
         let normalized = (self.n * freq) % self.sample_rate;
         let cycle_index = ((normalized as f32) / (self.sample_rate as f32) * 8.) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_2 as usize][cycle_index]
