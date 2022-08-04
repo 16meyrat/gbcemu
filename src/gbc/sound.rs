@@ -253,17 +253,17 @@ impl Synth {
 
     fn update_cmd(&mut self) {
         let mut new_state = self.reg_state.clone();
+        let mut trigger_1 = false;
+        let mut trigger_2 = false;
         while let Ok(state) = self.rx.try_recv() {
             new_state = state;
-        }
-        if self.reg_state.sound_length_1 != new_state.sound_length_1{
-            self.sound_length_1 = new_state.sound_length_1;
-        }
-        if self.reg_state.sound_length_2 != new_state.sound_length_2{
-            self.sound_length_2 = new_state.sound_length_2;
+            trigger_1 |= new_state.trigger_1;
+            trigger_2 |= new_state.trigger_2;
         }
         self.hz_frequency_1 = (131072./(2048.-(new_state.frequency_1 as f32)).round()) as u32;
         self.hz_frequency_2 = (131072./(2048.-(new_state.frequency_2 as f32)).round()) as u32;
+        new_state.trigger_1 = trigger_1;
+        new_state.trigger_2 = trigger_2;
         self.reg_state = new_state;
     }
 
@@ -323,7 +323,6 @@ impl Synth {
     }
 
     fn next_square_2(&mut self) -> f32 {
-        return 0.;
         if self.reg_state.length_en_2 && self.sound_length_2 != 0 && self.length_timer == 0 {
             self.sound_length_2 -= 1;
         }
