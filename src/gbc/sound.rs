@@ -108,6 +108,27 @@ impl Busable for Sound {
                 self.state.trigger_1 = value & 0x80 != 0;
                 self.state.length_en_1 = value & 0x40 != 0;
             }
+            0xff15 => {
+                eprintln!("Write to unused sound reguister ff15");
+            }
+            0xff16 => {
+                self.state.wave_pattern_2 = value >> 6;
+                self.state.sound_length_2 = 64 - (value & 0x3f);
+            }
+            0xff17 => {
+                self.state.envelope_vol_2 = value >> 4;
+                self.state.envelope_increase_2 = value & 0x08 != 0;
+                self.state.envelope_sweep_2 = value & 0x07;
+            }
+            0xff18 => {
+                self.state.frequency_2 = self.state.frequency_1 & 0xff00 | value as u16;
+            }
+            0xff19 => {
+                self.state.frequency_2 =
+                    self.state.frequency_2 & 0x00ff | ((value & 0x7) as u16) << 8;
+                self.state.trigger_2 = value & 0x80 != 0;
+                self.state.length_en_2 = value & 0x40 != 0;
+            }
             0xff24 => {
                 self.state.left_vol = (value & 0x70) >> 4;
                 self.state.right_vol = value & 0x07;
@@ -146,6 +167,19 @@ struct SynthRegState {
 
     trigger_1: bool,
     length_en_1: bool,
+
+    wave_pattern_2: u8,
+    sound_length_2: u8,
+
+    envelope_vol_2: u8,
+    envelope_increase_2: bool,
+    envelope_sweep_2: u8,
+
+    frequency_2: u16,
+
+    trigger_2: bool,
+    length_en_2: bool,
+
     channel_pan: u8,
     left_vol: u8,
     right_vol: u8,
@@ -193,6 +227,7 @@ struct Synth {
     length_timer: u8,
 
     sound_length_1: u8,
+    sound_length_2: u8,
 }
 
 impl Synth {
@@ -207,6 +242,7 @@ impl Synth {
             timer_512: 0,
             length_timer: 0,
             sound_length_1: 0,
+            sound_length_2: 0,
         }
     }
 
@@ -217,6 +253,9 @@ impl Synth {
         }
         if self.reg_state.sound_length_1 != new_state.sound_length_1{
             self.sound_length_1 = new_state.sound_length_1;
+        }
+        if self.reg_state.sound_length_2 != new_state.sound_length_2{
+            self.sound_length_2 = new_state.sound_length_2;
         }
         self.reg_state = new_state;
     }
@@ -235,7 +274,8 @@ impl Synth {
                 self.length_timer = 0;
             }
         }
-        let square = self.next_square_1();
+        let square1 = self.next_square_1();
+        let square2 = self.next_square_2();
         self.n += 1;
         if self.n % self.sample_rate == 0 {
             self.n = 0;
@@ -243,12 +283,19 @@ impl Synth {
         let mut left = 0.;
         let mut right = 0.;
         if self.reg_state.channel_pan & 0x10 != 0 {
-            left += square;
+            left += square1;
+        }
+        if self.reg_state.channel_pan & 0x20 != 0 {
+            left += square2;
         }
         if self.reg_state.channel_pan & 0x01 != 0 {
-            right += square;
+            right += square1;
         }
-        (left*0.1, right*0.1)
+        if self.reg_state.channel_pan & 0x02 != 0 {
+            right += square2;
+        }
+
+        (left*0.1*self.reg_state.left_vol as f32 / 8., right*0.1 * self.reg_state.right_vol as f32 / 8.)
     }
 
     fn next_square_1(&mut self) -> f32 {
@@ -256,15 +303,31 @@ impl Synth {
             self.sound_length_1 -= 1;
         }
         if self.reg_state.trigger_1 {
-            self.sound_length_1 = 64;
+            self.sound_length_1 = self.reg_state.sound_length_2;
         }
         if self.sound_length_1 == 0 {
             return 0.;
         }
-        let freq = 2048u64.checked_sub(self.reg_state.frequency_1 as u64).expect("Underflow");
+        let freq =0u64.checked_add(self.reg_state.frequency_1 as u64).expect("Underflow");
         let normalized = (self.n * freq) % self.sample_rate;
         let cycle_index = ((normalized as f32) / (self.sample_rate as f32) * 8.) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_1 as usize][cycle_index]
+    }
+
+    fn next_square_2(&mut self) -> f32 {
+        if self.reg_state.length_en_2 && self.sound_length_2 != 0 && self.length_timer == 0 {
+            self.sound_length_2 -= 1;
+        }
+        if self.reg_state.trigger_2 {
+            self.sound_length_2 = self.reg_state.sound_length_2;
+        }
+        if self.sound_length_2 == 0 {
+            return 0.;
+        }
+        let freq = 0u64.checked_add(self.reg_state.frequency_2 as u64).expect("Underflow");
+        let normalized = (self.n * freq) % self.sample_rate;
+        let cycle_index = ((normalized as f32) / (self.sample_rate as f32) * 8.) as usize;
+        SQUARE_PATTERN[self.reg_state.wave_pattern_2 as usize][cycle_index]
     }
 }
 
