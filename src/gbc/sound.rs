@@ -37,7 +37,7 @@ impl Sound {
         let supported_config = supported_configs_range
             .find(|c| c.channels() == 2 && matches!(c.sample_format(), SampleFormat::F32))
             .context("no suitable config")?
-            .with_sample_rate(SampleRate(44100));
+            .with_sample_rate(SampleRate(51200));
 
         #[cfg(feature="audio-log")]
         println!("Supported audio config: {supported_config:?}");
@@ -92,7 +92,7 @@ impl Busable for Sound {
             }
             0xff11 => {
                 self.state.wave_pattern_1 = value >> 6;
-                self.state.sound_lendth_1 = value & 0x3f;
+                self.state.sound_length_1 = 64 - (value & 0x3f);
             }
             0xff12 => {
                 self.state.envelope_vol_1 = value >> 4;
@@ -123,6 +123,7 @@ impl Busable for Sound {
         self.tx
             .send(self.state.clone())
             .expect("Failed to send SyntCmd to audio thread");
+        self.state.trigger_1 = false;
     }
 }
 
@@ -135,7 +136,7 @@ struct SynthRegState {
     sweep_shift_1: u8,
 
     wave_pattern_1: u8,
-    sound_lendth_1: u8,
+    sound_length_1: u8,
 
     envelope_vol_1: u8,
     envelope_increase_1: bool,
@@ -187,27 +188,52 @@ struct Synth {
     reg_state: SynthRegState,
     n: u64,
     sample_rate: u64,
+    timer_512_reset: u32,
+    timer_512: u32,
+    length_timer: u8,
+
+    sound_length_1: u8,
 }
 
 impl Synth {
     fn new(rx: Receiver<SynthRegState>, cfg: &StreamConfig) -> Self {
+        let sample_rate = cfg.sample_rate.0 as u64;
         Self {
             rx,
             reg_state: Default::default(),
             n: 0,
-            sample_rate: cfg.sample_rate.0 as u64,
+            sample_rate,
+            timer_512_reset: (sample_rate / 512) as u32,
+            timer_512: 0,
+            length_timer: 0,
+            sound_length_1: 0,
         }
     }
 
     fn update_cmd(&mut self) {
-        while let Ok(new_state) = self.rx.try_recv() {
-            self.reg_state = new_state;
+        let mut new_state = self.reg_state.clone();
+        while let Ok(state) = self.rx.try_recv() {
+            new_state = state;
         }
+        if self.reg_state.sound_length_1 != new_state.sound_length_1{
+            self.sound_length_1 = new_state.sound_length_1;
+        }
+        self.reg_state = new_state;
     }
 
     fn next_sample(&mut self) -> (f32, f32) {
         if !self.reg_state.sound_enable {
             return (0.,0.);
+        }
+        self.timer_512 += 1;
+        if self.timer_512 >= self.timer_512_reset {
+            self.timer_512 = 0;
+        }
+        if self.timer_512 == 0 {
+            self.length_timer += 1;
+            if self.length_timer >=2 {
+                self.length_timer = 0;
+            }
         }
         let square = self.next_square_1();
         self.n += 1;
@@ -226,6 +252,15 @@ impl Synth {
     }
 
     fn next_square_1(&mut self) -> f32 {
+        if self.reg_state.length_en_1 && self.sound_length_1 != 0 && self.length_timer == 0 {
+            self.sound_length_1 -= 1;
+        }
+        if self.reg_state.trigger_1 {
+            self.sound_length_1 = 64;
+        }
+        if self.sound_length_1 == 0 {
+            return 0.;
+        }
         let freq = 2048u64.checked_sub(self.reg_state.frequency_1 as u64).expect("Underflow");
         let normalized = (self.n * freq) % self.sample_rate;
         let cycle_index = ((normalized as f32) / (self.sample_rate as f32) * 8.) as usize;
