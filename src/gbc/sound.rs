@@ -145,6 +145,7 @@ impl Busable for Sound {
             .send(self.state.clone())
             .expect("Failed to send SyntCmd to audio thread");
         self.state.trigger_1 = false;
+        self.state.trigger_2 = false;
     }
 }
 
@@ -276,7 +277,7 @@ impl Synth {
         }
         if self.timer_512 == 0 {
             self.length_timer += 1;
-            if self.length_timer >=2 {
+            if self.length_timer >= 2 {
                 self.length_timer = 0;
             }
         }
@@ -309,30 +310,33 @@ impl Synth {
             self.sound_length_1 -= 1;
         }
         if self.reg_state.trigger_1 {
-            self.sound_length_1 = self.reg_state.sound_length_2;
+            self.sound_length_1 = self.reg_state.sound_length_1;
+            self.reg_state.trigger_1 = false;
         }
         if self.sound_length_1 == 0 {
             return 0.;
         }
         let freq = self.hz_frequency_1 as u64;
         let normalized = (self.n * freq) % self.sample_rate;
-        let cycle_index = ((normalized as f32) / (self.sample_rate as f32) * 8.) as usize;
+        let cycle_index = (8. * (normalized as f32) / (self.sample_rate as f32)) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_1 as usize][cycle_index]
     }
 
     fn next_square_2(&mut self) -> f32 {
+        return 0.;
         if self.reg_state.length_en_2 && self.sound_length_2 != 0 && self.length_timer == 0 {
             self.sound_length_2 -= 1;
         }
         if self.reg_state.trigger_2 {
             self.sound_length_2 = self.reg_state.sound_length_2;
+            self.reg_state.trigger_2 = false;
         }
         if self.sound_length_2 == 0 {
             return 0.;
         }
         let freq =self.hz_frequency_2 as u64;
         let normalized = (self.n * freq) % self.sample_rate;
-        let cycle_index = ((normalized as f32) / (self.sample_rate as f32) * 8.) as usize;
+        let cycle_index = (8. * (normalized as f32) / (self.sample_rate as f32)) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_2 as usize][cycle_index]
     }
 }
