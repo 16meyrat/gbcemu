@@ -11,4 +11,9 @@ num_enum = "0.5.7"
 sdl2 = "0.35"
 arrayvec = "0.7"
 anyhow = "1"
-cpal = { version = "0.13.5", features = ["jack"] }
+cpal = { version = "0.13" }
+
+[features]
+
+audio-log = []
+disasm = []

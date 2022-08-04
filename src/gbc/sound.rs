@@ -1,11 +1,17 @@
+use std::sync::mpsc::{channel, Receiver, Sender};
+
 use anyhow::{Context, Result};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    Device, Sample,
+    BufferSize, Sample, SampleRate, Stream, StreamConfig, SupportedBufferSize,
 };
 
+use super::bus::Busable;
+
 pub struct Sound {
-    device: Device,
+    _stream: Stream,
+    state: SynthRegState,
+    tx: Sender<SynthRegState>,
 }
 
 impl Sound {
@@ -14,30 +20,220 @@ impl Sound {
         let device = host
             .default_output_device()
             .context("no output device available")?;
+
+        /*
         let mut supported_configs_range = device
             .supported_output_configs()
             .context("error while querying configs")?;
+        for a in supported_configs_range {
+            println!("Supported audio: {:?}", a);
+        }
+        */
+
+        let mut supported_configs_range = device
+            .supported_output_configs()
+            .context("error while querying configs")?;
+
         let supported_config = supported_configs_range
-            .next()
-            .context("no supported config?!")?
-            .with_max_sample_rate();
-        use cpal::{SampleFormat};
-        let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
+            .find(|c| c.channels() == 2 && matches!(c.sample_format(), SampleFormat::F32))
+            .context("no suitable config")?
+            .with_sample_rate(SampleRate(44100));
+
+        #[cfg(feature="audio-log")]
+        println!("Supported audio config: {supported_config:?}");
+
+        use cpal::SampleFormat;
         let sample_format = supported_config.sample_format();
-        let config = supported_config.into();
+        let min_bufsize = match supported_config.buffer_size() {
+            &SupportedBufferSize::Range { min, max: _ } => min,
+            _ => 0,
+        };
+
+        let mut config: StreamConfig = supported_config.into();
+        config.buffer_size = BufferSize::Fixed((1024).max(min_bufsize));
+
+        #[cfg(feature="audio-log")]
+        println!("Audio config: {config:?}");
+
+        let (synth, tx) = new_synth(&config);
+        let state = Default::default();
+
         let stream = match sample_format {
-            SampleFormat::F32 => device.build_output_stream(&config, write_silence::<f32>, err_fn),
-            SampleFormat::I16 => device.build_output_stream(&config, write_silence::<i16>, err_fn),
-            SampleFormat::U16 => device.build_output_stream(&config, write_silence::<u16>, err_fn),
+            SampleFormat::F32 => start_audio_stream::<f32>(&device, &config, synth),
+            SampleFormat::I16 => start_audio_stream::<i16>(&device, &config, synth),
+            SampleFormat::U16 => start_audio_stream::<u16>(&device, &config, synth),
         }
         .context("Failed to build output audio stream")?;
         stream.play().context("Failed to play stream")?;
-        Ok(Self { device })
+        Ok(Self {
+            _stream: stream,
+            tx,
+            state,
+        })
     }
 }
 
-fn write_silence<T: Sample>(data: &mut [T], _: &cpal::OutputCallbackInfo) {
-    for sample in data.iter_mut() {
-        *sample = Sample::from(&0.0);
+impl Busable for Sound {
+    fn read(&self, addr: u16) -> u8 {
+        match addr {
+            0xff10 => 0x80 | self.state.sweep_time_1 | (self.state.negate_1 as u8) << 3,
+            _ => 0, // TODO: panic
+        }
     }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        #[cfg(feature="audio-log")]
+        println!("Audio write ({value:#x})to {addr:#x}");
+        match addr {
+            0xff10 => {
+                self.state.sweep_shift_1 = value & 0x07;
+                self.state.negate_1 = value & 0x08 != 0;
+                self.state.sweep_time_1 = (value & 0xf0) >> 4;
+            }
+            0xff11 => {
+                self.state.wave_pattern_1 = value >> 6;
+                self.state.sound_lendth_1 = value & 0x3f;
+            }
+            0xff12 => {
+                self.state.envelope_vol_1 = value >> 4;
+                self.state.envelope_increase_1 = value & 0x08 != 0;
+                self.state.envelope_sweep_1 = value & 0x07;
+            }
+            0xff13 => {
+                self.state.frequency_1 = self.state.frequency_1 & 0xff00 | value as u16;
+            }
+            0xff14 => {
+                self.state.frequency_1 =
+                    self.state.frequency_1 & 0x00ff | ((value & 0x7) as u16) << 8;
+                self.state.trigger_1 = value & 0x80 != 0;
+                self.state.length_en_1 = value & 0x40 != 0;
+            }
+            0xff24 => {
+                self.state.left_vol = (value & 0x70) >> 4;
+                self.state.right_vol = value & 0x07;
+            }
+            0xff25 => {
+                self.state.channel_pan = value;
+            }
+            0xff26 => {
+                self.state.sound_enable = value & 0x80 != 0;
+            }
+            _ => {} // TODO: panic
+        }
+        self.tx
+            .send(self.state.clone())
+            .expect("Failed to send SyntCmd to audio thread");
+    }
+}
+
+#[derive(Clone, Default)]
+struct SynthRegState {
+    sound_enable: bool,
+
+    sweep_time_1: u8,
+    negate_1: bool,
+    sweep_shift_1: u8,
+
+    wave_pattern_1: u8,
+    sound_lendth_1: u8,
+
+    envelope_vol_1: u8,
+    envelope_increase_1: bool,
+    envelope_sweep_1: u8,
+
+    frequency_1: u16,
+
+    trigger_1: bool,
+    length_en_1: bool,
+    channel_pan: u8,
+    left_vol: u8,
+    right_vol: u8,
+}
+
+const SQUARE_PATTERN: [[f32;8];4] = [
+    [-1., -1., -1., -1., -1., -1., -1., 1.],
+    [-1., -1., -1., -1., -1., -1., 1., 1.],
+    [-1., -1., -1., -1., 1., 1., 1., 1.],
+    [1., 1., 1., 1., 1., 1., -1., -1.]
+];
+
+fn start_audio_stream<T: Sample>(
+    device: &cpal::Device,
+    config: &cpal::StreamConfig,
+    mut synth: Synth,
+) -> Result<Stream> {
+    let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
+    let stream = device
+        .build_output_stream(
+            config,
+            move |data: &mut [T], _: &cpal::OutputCallbackInfo| audio_thread(data, &mut synth),
+            err_fn,
+        )
+        .context("Failed start audio thread")?;
+    Ok(stream)
+}
+
+fn audio_thread<T: Sample>(data: &mut [T], synth: &mut Synth) {
+    synth.update_cmd();
+    for channels in data.chunks_mut(2){
+        let sample = synth.next_sample();
+        channels[0] = Sample::from::<f32>(&sample.0);
+        channels[1] = Sample::from::<f32>(&sample.1);
+    }
+}
+
+struct Synth {
+    rx: Receiver<SynthRegState>,
+    reg_state: SynthRegState,
+    n: u64,
+    sample_rate: u64,
+}
+
+impl Synth {
+    fn new(rx: Receiver<SynthRegState>, cfg: &StreamConfig) -> Self {
+        Self {
+            rx,
+            reg_state: Default::default(),
+            n: 0,
+            sample_rate: cfg.sample_rate.0 as u64,
+        }
+    }
+
+    fn update_cmd(&mut self) {
+        while let Ok(new_state) = self.rx.try_recv() {
+            self.reg_state = new_state;
+        }
+    }
+
+    fn next_sample(&mut self) -> (f32, f32) {
+        if !self.reg_state.sound_enable {
+            return (0.,0.);
+        }
+        let square = self.next_square_1();
+        self.n += 1;
+        if self.n % self.sample_rate == 0 {
+            self.n = 0;
+        }
+        let mut left = 0.;
+        let mut right = 0.;
+        if self.reg_state.channel_pan & 0x10 != 0 {
+            left += square;
+        }
+        if self.reg_state.channel_pan & 0x01 != 0 {
+            right += square;
+        }
+        (left*0.1, right*0.1)
+    }
+
+    fn next_square_1(&mut self) -> f32 {
+        let freq = 2048u64.checked_sub(self.reg_state.frequency_1 as u64).expect("Underflow");
+        let normalized = (self.n * freq) % self.sample_rate;
+        let cycle_index = ((normalized as f32) / (self.sample_rate as f32) * 8.) as usize;
+        SQUARE_PATTERN[self.reg_state.wave_pattern_1 as usize][cycle_index]
+    }
+}
+
+fn new_synth(cfg: &StreamConfig) -> (Synth, Sender<SynthRegState>) {
+    let (tx, rx) = channel();
+    (Synth::new(rx, cfg), tx)
 }

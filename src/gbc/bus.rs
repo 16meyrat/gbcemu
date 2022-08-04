@@ -65,9 +65,7 @@ impl Busable for Bus {
             0xff7f => 0, //empty
             0xff01 => 0, // serial
             0xff02 => 0, // serial
-            x if (0xff10..0xff27).contains(&x) => 0, // sound
-            x if (0xff30..0xff40).contains(&x) => 0, // sound
-
+            x if (0xff10..0xff40).contains(&x) => self.sound.read(addr), // sound
             _ => panic!("Illegal read at {:#x}", addr)
         }
     }
@@ -111,8 +109,7 @@ impl Busable for Bus {
             0xff7f => {}, //empty
             0xff01 => {}, // serial
             0xff02 => {}, // serial
-            x if (0xff10..0xff27).contains(&x) => {}, // sound
-            x if (0xff30..0xff40).contains(&x) => {}, // sound
+            x if (0xff10..0xff40).contains(&x) => self.sound.write(addr, value), // sound
             _ => panic!("Illegal write at {:#x}", addr)
         };
     }
