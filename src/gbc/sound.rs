@@ -39,7 +39,7 @@ impl Sound {
             .context("no suitable config")?
             .with_sample_rate(SampleRate(51200));
 
-        #[cfg(feature="audio-log")]
+        #[cfg(feature = "audio-log")]
         println!("Supported audio config: {supported_config:?}");
 
         use cpal::SampleFormat;
@@ -52,7 +52,7 @@ impl Sound {
         let mut config: StreamConfig = supported_config.into();
         config.buffer_size = BufferSize::Fixed((512).max(min_bufsize));
 
-        #[cfg(feature="audio-log")]
+        #[cfg(feature = "audio-log")]
         println!("Audio config: {config:?}");
 
         let (synth, tx) = new_synth(&config);
@@ -82,7 +82,7 @@ impl Busable for Sound {
     }
 
     fn write(&mut self, addr: u16, value: u8) {
-        #[cfg(feature="audio-log")]
+        #[cfg(feature = "audio-log")]
         println!("Audio write ({value:#x})to {addr:#x}");
         match addr {
             0xff10 => {
@@ -186,11 +186,11 @@ struct SynthRegState {
     right_vol: u8,
 }
 
-const SQUARE_PATTERN: [[f32;8];4] = [
+const SQUARE_PATTERN: [[f32; 8]; 4] = [
     [-1., -1., -1., -1., -1., -1., -1., 1.],
     [-1., -1., -1., -1., -1., -1., 1., 1.],
     [-1., -1., -1., -1., 1., 1., 1., 1.],
-    [1., 1., 1., 1., 1., 1., -1., -1.]
+    [1., 1., 1., 1., 1., 1., -1., -1.],
 ];
 
 fn start_audio_stream<T: Sample>(
@@ -211,7 +211,7 @@ fn start_audio_stream<T: Sample>(
 
 fn audio_thread<T: Sample>(data: &mut [T], synth: &mut Synth) {
     synth.update_cmd();
-    for channels in data.chunks_mut(2){
+    for channels in data.chunks_mut(2) {
         let sample = synth.next_sample();
         channels[0] = Sample::from::<f32>(&sample.0);
         channels[1] = Sample::from::<f32>(&sample.1);
@@ -226,11 +226,17 @@ struct Synth {
     timer_512_reset: u32,
     timer_512: u32,
     length_timer: u8,
+    envelope_master_timer: u8,
 
     hz_frequency_1: u32,
     sound_length_1: u8,
+    current_vol_1: u8,
+    envelope_timer_1: u8,
+
     hz_frequency_2: u32,
     sound_length_2: u8,
+    current_vol_2: u8,
+    envelope_timer_2: u8,
 }
 
 impl Synth {
@@ -243,11 +249,16 @@ impl Synth {
             sample_rate,
             timer_512_reset: (sample_rate / 512) as u32,
             timer_512: 0,
+            envelope_master_timer: 0,
             length_timer: 0,
             hz_frequency_1: 0,
             sound_length_1: 0,
+            envelope_timer_1: 0,
+            current_vol_1: 0,
             hz_frequency_2: 0,
             sound_length_2: 0,
+            envelope_timer_2: 0,
+            current_vol_2: 0,
         }
     }
 
@@ -259,10 +270,16 @@ impl Synth {
             new_state = state;
             trigger_1 |= new_state.trigger_1;
             if new_state.trigger_1 {
-                self.hz_frequency_1 = (131072./(2048.-(new_state.frequency_1 as f32)).round()) as u32;
+                self.hz_frequency_1 =
+                    (131072. / (2048. - (new_state.frequency_1 as f32)).round()) as u32;
+                self.current_vol_1 = new_state.envelope_vol_1;
+                self.envelope_timer_1 = 0;
             }
             if new_state.trigger_2 {
-                self.hz_frequency_2 = (131072./(2048.-(new_state.frequency_2 as f32)).round()) as u32;
+                self.hz_frequency_2 =
+                    (131072. / (2048. - (new_state.frequency_2 as f32)).round()) as u32;
+                self.current_vol_2 = new_state.envelope_vol_2;
+                self.envelope_timer_2 = 0;
             }
             trigger_2 |= new_state.trigger_2;
         }
@@ -273,7 +290,7 @@ impl Synth {
 
     fn next_sample(&mut self) -> (f32, f32) {
         if !self.reg_state.sound_enable {
-            return (0.,0.);
+            return (0., 0.);
         }
         self.timer_512 += 1;
         if self.timer_512 >= self.timer_512_reset {
@@ -283,6 +300,10 @@ impl Synth {
             self.length_timer += 1;
             if self.length_timer >= 2 {
                 self.length_timer = 0;
+            }
+            self.envelope_master_timer += 1;
+            if self.envelope_master_timer >= 8 {
+                self.envelope_master_timer = 0;
             }
         }
         let square1 = self.next_square_1();
@@ -306,7 +327,10 @@ impl Synth {
             right += square2;
         }
 
-        (left*0.1*self.reg_state.left_vol as f32 / 8., right*0.1 * self.reg_state.right_vol as f32 / 8.)
+        (
+            left * 0.4 * self.reg_state.left_vol as f32 / 8.,
+            right * 0.4 * self.reg_state.right_vol as f32 / 8.,
+        )
     }
 
     fn next_square_1(&mut self) -> f32 {
@@ -320,10 +344,29 @@ impl Synth {
         if self.sound_length_1 == 0 {
             return 0.;
         }
+        if self.reg_state.envelope_sweep_1 != 0 {
+            if self.envelope_master_timer == 0 {
+                if self.envelope_timer_1 == 0 {
+                    self.envelope_timer_1 = self.reg_state.envelope_sweep_1;
+                } else {
+                    self.envelope_timer_1 -= 1;
+                }
+            }
+            if self.envelope_timer_1 == 0 {
+                self.reg_state.envelope_sweep_1 = 0;
+                if self.reg_state.envelope_increase_1 && self.current_vol_1 != 0xf {
+                    self.current_vol_1 += 1;
+                } else if !self.reg_state.envelope_increase_1 && self.current_vol_1 != 0x0 {
+                    self.current_vol_1 -= 1;
+                }
+            }
+        }
         let freq = self.hz_frequency_1 as u64;
         let normalized = (self.n * freq) % self.sample_rate;
         let cycle_index = (8. * (normalized as f32) / (self.sample_rate as f32)) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_1 as usize][cycle_index]
+            * self.current_vol_1 as f32
+            / 15.
     }
 
     fn next_square_2(&mut self) -> f32 {
@@ -337,10 +380,29 @@ impl Synth {
         if self.sound_length_2 == 0 {
             return 0.;
         }
-        let freq =self.hz_frequency_2 as u64;
+        if self.reg_state.envelope_sweep_2 != 0 {
+            if self.envelope_master_timer == 0 {
+                if self.envelope_timer_2 == 0 {
+                    self.envelope_timer_2 = self.reg_state.envelope_sweep_2;
+                } else {
+                    self.envelope_timer_2 -= 1;
+                }
+            }
+            if self.envelope_timer_2 == 0 {
+                self.reg_state.envelope_sweep_2 = 0;
+                if self.reg_state.envelope_increase_2 && self.current_vol_2 != 0xf {
+                    self.current_vol_2 += 1;
+                } else if !self.reg_state.envelope_increase_2 && self.current_vol_2 != 0x0 {
+                    self.current_vol_2 -= 1;
+                }
+            }
+        }
+        let freq = self.hz_frequency_2 as u64;
         let normalized = (self.n * freq) % self.sample_rate;
         let cycle_index = (8. * (normalized as f32) / (self.sample_rate as f32)) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_2 as usize][cycle_index]
+            * self.current_vol_2 as f32
+            / 15.
     }
 }
 
