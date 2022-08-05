@@ -50,7 +50,7 @@ impl Sound {
         };
 
         let mut config: StreamConfig = supported_config.into();
-        config.buffer_size = BufferSize::Fixed((1024).max(min_bufsize));
+        config.buffer_size = BufferSize::Fixed((512).max(min_bufsize));
 
         #[cfg(feature="audio-log")]
         println!("Audio config: {config:?}");
