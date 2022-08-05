@@ -258,10 +258,14 @@ impl Synth {
         while let Ok(state) = self.rx.try_recv() {
             new_state = state;
             trigger_1 |= new_state.trigger_1;
+            if new_state.trigger_1 {
+                self.hz_frequency_1 = (131072./(2048.-(new_state.frequency_1 as f32)).round()) as u32;
+            }
+            if new_state.trigger_2 {
+                self.hz_frequency_2 = (131072./(2048.-(new_state.frequency_2 as f32)).round()) as u32;
+            }
             trigger_2 |= new_state.trigger_2;
         }
-        self.hz_frequency_1 = (131072./(2048.-(new_state.frequency_1 as f32)).round()) as u32;
-        self.hz_frequency_2 = (131072./(2048.-(new_state.frequency_2 as f32)).round()) as u32;
         new_state.trigger_1 = trigger_1;
         new_state.trigger_2 = trigger_2;
         self.reg_state = new_state;
