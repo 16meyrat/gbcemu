@@ -77,6 +77,9 @@ impl Busable for Sound {
     fn read(&self, addr: u16) -> u8 {
         match addr {
             0xff10 => 0x80 | self.state.sweep_time_1 | (self.state.negate_1 as u8) << 3,
+            0xff12 => {
+                self.state.envelope_vol_1 << 4 | (self.state.envelope_increase_1 as u8) << 3 | self.state.envelope_sweep_1 & 0x7
+            }
             _ => 0, // TODO: panic
         }
     }
@@ -273,15 +276,16 @@ impl Synth {
                 self.hz_frequency_1 =
                     (131072. / (2048. - (new_state.frequency_1 as f32)).round()) as u32;
                 self.current_vol_1 = new_state.envelope_vol_1;
-                self.envelope_timer_1 = 0;
+                self.envelope_timer_1 = new_state.envelope_sweep_1;
             }
+            trigger_2 |= new_state.trigger_2;
+
             if new_state.trigger_2 {
                 self.hz_frequency_2 =
                     (131072. / (2048. - (new_state.frequency_2 as f32)).round()) as u32;
                 self.current_vol_2 = new_state.envelope_vol_2;
-                self.envelope_timer_2 = 0;
+                self.envelope_timer_2 = new_state.envelope_sweep_2;
             }
-            trigger_2 |= new_state.trigger_2;
         }
         new_state.trigger_1 = trigger_1;
         new_state.trigger_2 = trigger_2;
@@ -296,13 +300,16 @@ impl Synth {
         if self.timer_512 >= self.timer_512_reset {
             self.timer_512 = 0;
         }
+        if self.envelope_master_timer == 0 {
+            self.envelope_master_timer = 1;
+        }
         if self.timer_512 == 0 {
             self.length_timer += 1;
             if self.length_timer >= 2 {
                 self.length_timer = 0;
             }
             self.envelope_master_timer += 1;
-            if self.envelope_master_timer >= 8 {
+            if self.envelope_master_timer >= 9 { // 0 only triggered for 1 sample
                 self.envelope_master_timer = 0;
             }
         }
@@ -344,21 +351,16 @@ impl Synth {
         if self.sound_length_1 == 0 {
             return 0.;
         }
-        if self.reg_state.envelope_sweep_1 != 0 {
-            if self.envelope_master_timer == 0 {
-                if self.envelope_timer_1 == 0 {
-                    self.envelope_timer_1 = self.reg_state.envelope_sweep_1;
-                } else {
-                    self.envelope_timer_1 -= 1;
-                }
-            }
+        if self.reg_state.envelope_sweep_1 != 0 && self.envelope_master_timer == 0 {
             if self.envelope_timer_1 == 0 {
-                self.reg_state.envelope_sweep_1 = 0;
+                self.envelope_timer_1 = self.reg_state.envelope_sweep_1;
                 if self.reg_state.envelope_increase_1 && self.current_vol_1 != 0xf {
                     self.current_vol_1 += 1;
                 } else if !self.reg_state.envelope_increase_1 && self.current_vol_1 != 0x0 {
                     self.current_vol_1 -= 1;
                 }
+            } else {
+                self.envelope_timer_1 -= 1;
             }
         }
         let freq = self.hz_frequency_1 as u64;
@@ -380,21 +382,16 @@ impl Synth {
         if self.sound_length_2 == 0 {
             return 0.;
         }
-        if self.reg_state.envelope_sweep_2 != 0 {
-            if self.envelope_master_timer == 0 {
-                if self.envelope_timer_2 == 0 {
-                    self.envelope_timer_2 = self.reg_state.envelope_sweep_2;
-                } else {
-                    self.envelope_timer_2 -= 1;
-                }
-            }
+        if self.reg_state.envelope_sweep_2 != 0 && self.envelope_master_timer == 0 {
             if self.envelope_timer_2 == 0 {
-                self.reg_state.envelope_sweep_2 = 0;
+                self.envelope_timer_2 = self.reg_state.envelope_sweep_2;
                 if self.reg_state.envelope_increase_2 && self.current_vol_2 != 0xf {
                     self.current_vol_2 += 1;
                 } else if !self.reg_state.envelope_increase_2 && self.current_vol_2 != 0x0 {
                     self.current_vol_2 -= 1;
                 }
+            } else {
+                self.envelope_timer_2 -= 1;
             }
         }
         let freq = self.hz_frequency_2 as u64;
