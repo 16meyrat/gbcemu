@@ -82,7 +82,11 @@ impl Busable for Sound {
                     | (self.state.envelope_increase_1 as u8) << 3
                     | self.state.envelope_sweep_1 & 0x7
             }
-            _ => 0, // TODO: panic
+            _ => {
+                #[cfg(feature = "audio-log")]
+                eprintln!("Sound read at {addr:#x}");
+                0
+            }, // TODO: panic
         }
     }
 
@@ -138,7 +142,7 @@ impl Busable for Sound {
                 self.state.wave.enabled = value & 0x80 != 0;
             }
             0xff1b => {
-                self.state.wave.length = value;
+                self.state.wave.length = 0x100 - value as u16;
             }
             0xff1c => {
                 self.state.wave.volume_shift = match (value >> 5) & 0x3 {
@@ -168,10 +172,10 @@ impl Busable for Sound {
             0xff26 => {
                 self.state.sound_enable = value & 0x80 != 0;
             }
-            0xff30..=0xff39 => {
+            0xff30..=0xff3f => {
                 let index = (addr - 0xff30) as usize;
-                self.state.wave.pattern[index] = value >> 4;
-                self.state.wave.pattern[index] = value & 0x0f;
+                self.state.wave.pattern[index * 2] = value >> 4;
+                self.state.wave.pattern[index * 2 + 1] = value & 0x0f;
             }
             _ => {} // TODO: panic
         }
@@ -180,6 +184,7 @@ impl Busable for Sound {
             .expect("Failed to send SyntCmd to audio thread");
         self.state.trigger_1 = false;
         self.state.trigger_2 = false;
+        self.state.wave.trigger = false;
     }
 }
 
@@ -225,7 +230,7 @@ struct SynthRegState {
 #[derive(Default, Clone)]
 struct SynthWave {
     enabled: bool,
-    length: u8,
+    length: u16,
     volume_shift: u8,
     frequency: u16,
     length_en: bool,
@@ -286,7 +291,7 @@ struct Synth {
     envelope_timer_2: u8,
 
     hz_frequency_3: u32,
-    sound_length_3: u8,
+    sound_length_3: u16,
     wave_timer: Timer,
     pattern_index_3: u32,
 }
@@ -325,28 +330,29 @@ impl Synth {
         let mut trigger_2 = false;
         let mut trigger_3 = false;
         while let Ok(state) = self.rx.try_recv() {
-            new_state = state;
-            trigger_1 |= new_state.trigger_1;
-            if new_state.trigger_1 {
+            trigger_1 |= state.trigger_1;
+            if state.trigger_1 {
                 self.hz_frequency_1 =
-                    (131072. / (2048. - (new_state.frequency_1 as f32)).round()) as u32;
-                self.current_vol_1 = new_state.envelope_vol_1;
-                self.envelope_timer_1 = new_state.envelope_sweep_1;
+                    (131072. / (2048. - (state.frequency_1 as f32)).round()) as u32;
+                self.current_vol_1 = state.envelope_vol_1;
+                self.envelope_timer_1 = state.envelope_sweep_1;
             }
-            trigger_2 |= new_state.trigger_2;
+            trigger_2 |= state.trigger_2;
 
-            if new_state.trigger_2 {
+            if state.trigger_2 {
                 self.hz_frequency_2 =
-                    (131072. / (2048. - (new_state.frequency_2 as f32)).round()) as u32;
-                self.current_vol_2 = new_state.envelope_vol_2;
-                self.envelope_timer_2 = new_state.envelope_sweep_2;
+                    (131072. / (2048. - (state.frequency_2 as f32)).round()) as u32;
+                self.current_vol_2 = state.envelope_vol_2;
+                self.envelope_timer_2 = state.envelope_sweep_2;
             }
-            trigger_3 |= new_state.wave.trigger;
-            if new_state.wave.trigger {
+            trigger_3 |= state.wave.trigger;
+            if state.wave.trigger {
                 self.hz_frequency_3 =
-                    (131072. / (2048. - (new_state.wave.frequency as f32)).round()) as u32;
+                    32 * (65536./ (2048. - (state.wave.frequency as f32)).round()) as u32;
                 self.wave_timer = Timer::new(self.hz_frequency_3, self.sample_rate);
+                self.pattern_index_3 = 2;
             }
+            new_state = state;
         }
         new_state.trigger_1 = trigger_1;
         new_state.trigger_2 = trigger_2;
@@ -496,7 +502,9 @@ impl Synth {
                 self.pattern_index_3 = 0;
             }
         }
-        ((self.reg_state.wave.pattern[self.pattern_index_3 as usize] >> self.reg_state.wave.volume_shift) as f32 - 7.) / 15.
+        ((self.reg_state.wave.pattern[self.pattern_index_3 as usize]
+            >> self.reg_state.wave.volume_shift) as f32)
+            / 7.5 - 0.5
     }
 }
 
@@ -546,7 +554,7 @@ impl Timer {
         } else {
             self.trigger = false;
         }
-        if self.sample_counter as f32 % self.sample_period < 0.0001 {
+        if self.sample_counter as f32 % self.sample_period < 0.001 {
             self.sample_counter = 0;
         }
     }
