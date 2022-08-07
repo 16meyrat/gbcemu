@@ -550,16 +550,51 @@ impl Timer {
         let approx_index = f32::trunc(self.sample_counter as f32 / self.sample_period) as u32;
         if approx_index != self.last_trigger {
             self.trigger = true;
-            self.last_trigger = approx_index;
+            if self.sample_counter as f32 % self.sample_period < 0.001 {
+                self.sample_counter = 0;
+                self.last_trigger = 0;
+            } else {
+                self.last_trigger = approx_index;
+            }
         } else {
             self.trigger = false;
-        }
-        if self.sample_counter as f32 % self.sample_period < 0.001 {
-            self.sample_counter = 0;
         }
     }
 
     fn is_triggered(&self) -> bool {
         self.trigger
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn wave_timer() {
+        let sample_rate = 51200;
+        let freq = 440;
+        let mut timer = Timer::new(freq, sample_rate);
+        let mut timer_count = 0;
+        for _ in 0..(sample_rate * 2) {
+            timer.sample_tick();
+            if timer.is_triggered() {
+                timer_count += 1;
+            }
+        }
+        assert_eq!(timer_count, freq * 2);
+    }
+    #[test]
+    fn wave_timer_lowfreq() {
+        let sample_rate = 51200;
+        let freq = 100;
+        let mut timer = Timer::new(freq, sample_rate);
+        let mut timer_count = 0;
+        for _ in 0..(sample_rate * 2) {
+            timer.sample_tick();
+            if timer.is_triggered() {
+                timer_count += 1;
+            }
+        }
+        assert_eq!(timer_count, freq * 2);
     }
 }
