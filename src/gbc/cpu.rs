@@ -143,7 +143,8 @@ impl Cpu {
 
         macro_rules! disasm {
             ($($arg:tt)+) => (
-                if cfg!(debug_assertions) {
+                #[cfg(feature = "disasm")] 
+                {
                     print!("0x{:<8x}: ", self.pc);
                     println!($($arg)+);
                 }
@@ -152,7 +153,8 @@ impl Cpu {
 
         macro_rules! disasm_pc {
             ($pc: expr, $($arg:tt)+) => (
-                if cfg!(debug_assertions) {
+                #[cfg(feature = "disasm")]
+                {
                     print!("0x{:<8x}: ", $pc);
                     println!($($arg)+);
                 }
@@ -1257,9 +1259,9 @@ impl Cpu {
                 self.set_flags(flags);
             }
             0xc3 => {
-                let pc = self.pc;
-                let addr = jump(self, bus);
-                disasm_pc!(pc, "JP {:#x}", addr);
+                let _pc = self.pc;
+                let _addr = jump(self, bus);
+                disasm_pc!(_pc, "JP {:#x}", _addr);
             }
             0xc2 => {
                 if self.zerof != 0 {
@@ -1267,9 +1269,9 @@ impl Cpu {
                     disasm!("JP NZ, <no_jump>");
                     self.pc += 2;
                 } else {
-                    let pc = self.pc;
-                    let addr = jump(self, bus);
-                    disasm_pc!(pc, "JP NZ, {:#x}", addr);
+                    let _pc = self.pc;
+                    let _addr = jump(self, bus);
+                    disasm_pc!(_pc, "JP NZ, {:#x}", _addr);
                 }
             }
             0xd2 => {
@@ -1278,9 +1280,9 @@ impl Cpu {
                     disasm!("JP NC, <no_jump>");
                     self.pc += 2;
                 } else {
-                    let pc = self.pc;
-                    let addr = jump(self, bus);
-                    disasm_pc!(pc, "JP NC, {:#x}", addr);
+                    let _pc = self.pc;
+                    let _addr = jump(self, bus);
+                    disasm_pc!(_pc, "JP NC, {:#x}", _addr);
                 }
             }
             0xca => {
@@ -1289,9 +1291,9 @@ impl Cpu {
                     disasm!("JP Z, <no_jump>");
                     self.pc += 2;
                 } else {
-                    let pc = self.pc;
-                    let addr = jump(self, bus);
-                    disasm_pc!(pc, "JP Z, {:#x}", addr);
+                    let _pc = self.pc;
+                    let _addr = jump(self, bus);
+                    disasm_pc!(_pc, "JP Z, {:#x}", _addr);
                 }
             }
             0xda => {
@@ -1300,9 +1302,9 @@ impl Cpu {
                     disasm!("JP C, <no_jump>");
                     self.pc += 2;
                 } else {
-                    let pc = self.pc;
-                    let addr = jump(self, bus);
-                    disasm_pc!(pc, "JP C, {:#x}", addr);
+                    let _pc = self.pc;
+                    let _addr = jump(self, bus);
+                    disasm_pc!(_pc, "JP C, {:#x}", _addr);
                 }
             }
             0xe9 => {
@@ -1312,15 +1314,15 @@ impl Cpu {
                 self.pc = u16::wrapping_sub(hl, 1);
             }
             0x18 => {
-                let pc = self.pc;
-                let addr = jrel(self, bus);
-                disasm_pc!(pc, "JR {:#x}", addr);
+                let _pc = self.pc;
+                let _addr = jrel(self, bus);
+                disasm_pc!(_pc, "JR {:#x}", _addr);
             }
             0x20 => {
                 if self.zerof == 0 {
-                    let pc = self.pc;
-                    let addr = jrel(self, bus);
-                    disasm_pc!(pc, "JR NZ, {:#x}", addr);
+                    let _pc = self.pc;
+                    let _addr = jrel(self, bus);
+                    disasm_pc!(_pc, "JR NZ, {:#x}", _addr);
                 } else {
                     self.wait = 8;
                     disasm!("JR NZ, <no_jump>");
@@ -1329,9 +1331,9 @@ impl Cpu {
             }
             0x30 => {
                 if self.carryf == 0 {
-                    let pc = self.pc;
-                    let addr = jrel(self, bus);
-                    disasm_pc!(pc, "JR NC, {:#x}", addr);
+                    let _pc = self.pc;
+                    let _addr = jrel(self, bus);
+                    disasm_pc!(_pc, "JR NC, {:#x}", _addr);
                 } else {
                     self.wait = 8;
                     disasm!("JR NC, <no_jump>");
@@ -1340,9 +1342,9 @@ impl Cpu {
             }
             0x28 => {
                 if self.zerof != 0 {
-                    let pc = self.pc;
-                    let addr = jrel(self, bus);
-                    disasm_pc!(pc, "JR Z, {:#x}", addr);
+                    let _pc = self.pc;
+                    let _addr = jrel(self, bus);
+                    disasm_pc!(_pc, "JR Z, {:#x}", _addr);
                 } else {
                     self.wait = 8;
                     disasm!("JR Z, <no_jump>");
@@ -1351,9 +1353,9 @@ impl Cpu {
             }
             0x38 => {
                 if self.carryf != 0 {
-                    let pc = self.pc;
-                    let addr = jrel(self, bus);
-                    disasm_pc!(pc, "JR C, {:#x}", addr);
+                    let _pc = self.pc;
+                    let _addr = jrel(self, bus);
+                    disasm_pc!(_pc, "JR C, {:#x}", _addr);
                 } else {
                     self.wait = 8;
                     disasm!("JR C, <no_jump>");
@@ -1637,7 +1639,8 @@ impl Cpu {
     fn cb_ext(&mut self, bus: &mut Bus) {
         macro_rules! disasm {
             ($($arg:tt)+) => (
-                if cfg!(debug_assertions) {
+                #[cfg(feature = "disasm")] 
+                {
                     print!("0x{:<8x}: ", self.pc - 1);
                     println!($($arg)+);
                 }
