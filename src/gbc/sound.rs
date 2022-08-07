@@ -78,7 +78,9 @@ impl Busable for Sound {
         match addr {
             0xff10 => 0x80 | self.state.sweep_time_1 | (self.state.negate_1 as u8) << 3,
             0xff12 => {
-                self.state.envelope_vol_1 << 4 | (self.state.envelope_increase_1 as u8) << 3 | self.state.envelope_sweep_1 & 0x7
+                self.state.envelope_vol_1 << 4
+                    | (self.state.envelope_increase_1 as u8) << 3
+                    | self.state.envelope_sweep_1 & 0x7
             }
             _ => 0, // TODO: panic
         }
@@ -132,6 +134,30 @@ impl Busable for Sound {
                 self.state.trigger_2 = value & 0x80 != 0;
                 self.state.length_en_2 = value & 0x40 != 0;
             }
+            0xff1a => {
+                self.state.wave.enabled = value & 0x80 != 0;
+            }
+            0xff1b => {
+                self.state.wave.length = value;
+            }
+            0xff1c => {
+                self.state.wave.volume_shift = match (value >> 5) & 0x3 {
+                    0 => 4,
+                    1 => 0,
+                    2 => 1,
+                    3 => 2,
+                    _ => unreachable!(),
+                };
+            }
+            0xff1d => {
+                self.state.wave.frequency = self.state.wave.frequency & 0xff00 | value as u16;
+            }
+            0xff1e => {
+                self.state.wave.frequency =
+                    self.state.wave.frequency & 0x00ff | ((value & 0x7) as u16) << 8;
+                self.state.wave.trigger = value & 0x80 != 0;
+                self.state.wave.length_en = value & 0x40 != 0;
+            }
             0xff24 => {
                 self.state.left_vol = (value & 0x70) >> 4;
                 self.state.right_vol = value & 0x07;
@@ -141,6 +167,11 @@ impl Busable for Sound {
             }
             0xff26 => {
                 self.state.sound_enable = value & 0x80 != 0;
+            }
+            0xff30..=0xff39 => {
+                let index = (addr - 0xff30) as usize;
+                self.state.wave.pattern[index] = value >> 4;
+                self.state.wave.pattern[index] = value & 0x0f;
             }
             _ => {} // TODO: panic
         }
@@ -187,6 +218,19 @@ struct SynthRegState {
     channel_pan: u8,
     left_vol: u8,
     right_vol: u8,
+
+    wave: SynthWave,
+}
+
+#[derive(Default, Clone)]
+struct SynthWave {
+    enabled: bool,
+    length: u8,
+    volume_shift: u8,
+    frequency: u16,
+    length_en: bool,
+    trigger: bool,
+    pattern: [u8; 32],
 }
 
 const SQUARE_PATTERN: [[f32; 8]; 4] = [
@@ -225,7 +269,7 @@ struct Synth {
     rx: Receiver<SynthRegState>,
     reg_state: SynthRegState,
     n: u64,
-    sample_rate: u64,
+    sample_rate: u32,
     timer_512_reset: u32,
     timer_512: u32,
     length_timer: u8,
@@ -240,11 +284,16 @@ struct Synth {
     sound_length_2: u8,
     current_vol_2: u8,
     envelope_timer_2: u8,
+
+    hz_frequency_3: u32,
+    sound_length_3: u8,
+    wave_timer: Timer,
+    pattern_index_3: u32,
 }
 
 impl Synth {
     fn new(rx: Receiver<SynthRegState>, cfg: &StreamConfig) -> Self {
-        let sample_rate = cfg.sample_rate.0 as u64;
+        let sample_rate = cfg.sample_rate.0;
         Self {
             rx,
             reg_state: Default::default(),
@@ -262,6 +311,11 @@ impl Synth {
             sound_length_2: 0,
             envelope_timer_2: 0,
             current_vol_2: 0,
+
+            hz_frequency_3: 0,
+            sound_length_3: 0,
+            wave_timer: Timer::new(0, sample_rate),
+            pattern_index_3: 0,
         }
     }
 
@@ -269,6 +323,7 @@ impl Synth {
         let mut new_state = self.reg_state.clone();
         let mut trigger_1 = false;
         let mut trigger_2 = false;
+        let mut trigger_3 = false;
         while let Ok(state) = self.rx.try_recv() {
             new_state = state;
             trigger_1 |= new_state.trigger_1;
@@ -286,9 +341,16 @@ impl Synth {
                 self.current_vol_2 = new_state.envelope_vol_2;
                 self.envelope_timer_2 = new_state.envelope_sweep_2;
             }
+            trigger_3 |= new_state.wave.trigger;
+            if new_state.wave.trigger {
+                self.hz_frequency_3 =
+                    (131072. / (2048. - (new_state.wave.frequency as f32)).round()) as u32;
+                self.wave_timer = Timer::new(self.hz_frequency_3, self.sample_rate);
+            }
         }
         new_state.trigger_1 = trigger_1;
         new_state.trigger_2 = trigger_2;
+        new_state.wave.trigger = trigger_3;
         self.reg_state = new_state;
     }
 
@@ -303,21 +365,27 @@ impl Synth {
         if self.envelope_master_timer == 0 {
             self.envelope_master_timer = 1;
         }
+        if self.length_timer == 0 {
+            self.length_timer += 1;
+        }
         if self.timer_512 == 0 {
             self.length_timer += 1;
-            if self.length_timer >= 2 {
+            if self.length_timer >= 3 {
+                // 0 only triggered for 1 sample
                 self.length_timer = 0;
             }
             self.envelope_master_timer += 1;
-            if self.envelope_master_timer >= 9 { // 0 only triggered for 1 sample
+            if self.envelope_master_timer >= 9 {
+                // 0 only triggered for 1 sample
                 self.envelope_master_timer = 0;
             }
         }
         let square1 = self.next_square_1();
         let square2 = self.next_square_2();
+        let wave = self.next_wave();
         self.n += 1;
-        if self.n % self.sample_rate == 0 {
-            self.n = 0;
+        if self.n > u64::MAX / 2 && self.n % (self.sample_rate as u64) == 0 {
+            self.n = 0; // TODO: better with lcm ?
         }
         let mut left = 0.;
         let mut right = 0.;
@@ -327,13 +395,18 @@ impl Synth {
         if self.reg_state.channel_pan & 0x20 != 0 {
             left += square2;
         }
+        if self.reg_state.channel_pan & 0x40 != 0 {
+            left += wave;
+        }
         if self.reg_state.channel_pan & 0x01 != 0 {
             right += square1;
         }
         if self.reg_state.channel_pan & 0x02 != 0 {
             right += square2;
         }
-
+        if self.reg_state.channel_pan & 0x04 != 0 {
+            right += wave;
+        }
         (
             left * 0.4 * self.reg_state.left_vol as f32 / 8.,
             right * 0.4 * self.reg_state.right_vol as f32 / 8.,
@@ -364,7 +437,7 @@ impl Synth {
             }
         }
         let freq = self.hz_frequency_1 as u64;
-        let normalized = (self.n * freq) % self.sample_rate;
+        let normalized = (self.n * freq) % (self.sample_rate as u64);
         let cycle_index = (8. * (normalized as f32) / (self.sample_rate as f32)) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_1 as usize][cycle_index]
             * self.current_vol_1 as f32
@@ -395,15 +468,90 @@ impl Synth {
             }
         }
         let freq = self.hz_frequency_2 as u64;
-        let normalized = (self.n * freq) % self.sample_rate;
+        let normalized = (self.n * freq) % (self.sample_rate as u64);
         let cycle_index = (8. * (normalized as f32) / (self.sample_rate as f32)) as usize;
         SQUARE_PATTERN[self.reg_state.wave_pattern_2 as usize][cycle_index]
             * self.current_vol_2 as f32
             / 15.
+    }
+
+    fn next_wave(&mut self) -> f32 {
+        if !self.reg_state.wave.enabled {
+            return 0.;
+        }
+        if self.reg_state.wave.length_en && self.sound_length_3 != 0 && self.length_timer == 0 {
+            self.sound_length_3 -= 1;
+        }
+        if self.reg_state.wave.trigger {
+            self.sound_length_3 = self.reg_state.wave.length;
+            self.reg_state.wave.trigger = false;
+        }
+        if self.sound_length_3 == 0 {
+            return 0.;
+        }
+        self.wave_timer.sample_tick();
+        if self.wave_timer.is_triggered() {
+            self.pattern_index_3 += 1;
+            if self.pattern_index_3 as usize >= self.reg_state.wave.pattern.len() {
+                self.pattern_index_3 = 0;
+            }
+        }
+        ((self.reg_state.wave.pattern[self.pattern_index_3 as usize] >> self.reg_state.wave.volume_shift) as f32 - 7.) / 15.
     }
 }
 
 fn new_synth(cfg: &StreamConfig) -> (Synth, Sender<SynthRegState>) {
     let (tx, rx) = channel();
     (Synth::new(rx, cfg), tx)
+}
+
+struct Timer {
+    sample_period: f32,
+    last_trigger: u32,
+    sample_counter: u64,
+    trigger: bool,
+    enabled: bool,
+}
+
+impl Timer {
+    fn new(hz_frequency: u32, sample_rate: u32) -> Self {
+        if hz_frequency == 0 {
+            return Self {
+                sample_period: 0.,
+                last_trigger: 0,
+                sample_counter: 0,
+                trigger: false,
+                enabled: false,
+            };
+        }
+        let sample_period = ((sample_rate as f64) / (hz_frequency as f64)) as f32;
+        Self {
+            sample_period,
+            last_trigger: 0,
+            sample_counter: 0,
+            trigger: false,
+            enabled: true,
+        }
+    }
+
+    fn sample_tick(&mut self) {
+        if !self.enabled {
+            return;
+        }
+        self.sample_counter += 1;
+        let approx_index = f32::trunc(self.sample_counter as f32 / self.sample_period) as u32;
+        if approx_index != self.last_trigger {
+            self.trigger = true;
+            self.last_trigger = approx_index;
+        } else {
+            self.trigger = false;
+        }
+        if self.sample_counter as f32 % self.sample_period < 0.0001 {
+            self.sample_counter = 0;
+        }
+    }
+
+    fn is_triggered(&self) -> bool {
+        self.trigger
+    }
 }
