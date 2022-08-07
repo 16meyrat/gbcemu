@@ -16,3 +16,10 @@ cpal = { version = "0.13" }
 [features]
 audio-log = []
 disasm = []
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = "thin"
+strip = true
