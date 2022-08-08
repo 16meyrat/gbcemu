@@ -391,7 +391,7 @@ impl Ppu {
             };
             if !sprite.x_flip {
                 for tile_x in 0..8 {
-                    let x = match (sprite.x + tile_x).checked_sub(8) {
+                    let x = match sprite.x.saturating_add(tile_x).checked_sub(8) {
                         Some(x) => x,
                         None => continue,
                     };
