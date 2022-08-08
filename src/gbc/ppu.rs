@@ -127,11 +127,11 @@ impl Ppu {
     }
 
     pub fn get_wx(&self) -> u8 {
-        self.wx + 7
+        self.wx
     }
 
     pub fn set_wx(&mut self, val: u8) {
-        self.wx = u8::wrapping_sub(val, 7);
+        self.wx = val;
     }
 
     pub fn get_wy(&self) -> u8 {
@@ -249,8 +249,7 @@ impl Ppu {
         self.int_hblank = val & 0x08 != 0;
     }
 
-    pub fn 
-    tick(&mut self) -> PpuInterrupt {
+    pub fn tick(&mut self) -> PpuInterrupt {
         if !self.enabled {
             return PpuInterrupt::None;
         }
@@ -264,12 +263,12 @@ impl Ppu {
 
         match self.current_mode {
             Mode::OamScan => {
-                self.wait = 170;
+                self.wait = 180;
                 self.current_mode = Mode::Rendering;
             }
             Mode::Rendering => {
                 self.render_line();
-                self.wait = 202;
+                self.wait = 196;
                 self.current_mode = Mode::HBlank;
                 if self.int_hblank {
                     res = PpuInterrupt::Stat;
@@ -296,7 +295,6 @@ impl Ppu {
                 if self.ly < 154 {
                     self.wait = 456;
                     self.ly += 1;
-                    //res = PpuInterrupt::VBlank;
                 } else {
                     self.ly = 0;
                     self.wait = 80;
@@ -360,9 +358,9 @@ impl Ppu {
             Some(result) => result,
             _ => return,
         };
-        let mut x = self.wx as usize;
+        let mut x = (self.wx as usize).saturating_sub(7);
         while x < gui::WIDTH {
-            let rel_x = x - self.wx as usize;
+            let rel_x = x + 7 - self.wx as usize;
             let tile_index =
                 self.vram[self.win_map_select as usize + y as usize / 8 * 32 + rel_x / 8];
             let tile_data = get_tile(self, tile_index, y as usize);
@@ -384,9 +382,8 @@ impl Ppu {
         let mut oam_data = self.get_sprites_on_line();
 
         oam_data.sort_by_key(|sprite| sprite.x);
-        for sprite in oam_data.iter().rev() {
+        for sprite in oam_data.iter().take(10).rev() {
             let tile = self.get_sprite_tile_line(sprite);
-            let x = (sprite.x - 8) as isize;
             let palette = if sprite.palette {
                 self.obj_palette1.clone()
             } else {
@@ -394,10 +391,13 @@ impl Ppu {
             };
             if !sprite.x_flip {
                 for tile_x in 0..8 {
+                    let x = match (sprite.x + tile_x).checked_sub(8) {
+                        Some(x) => x,
+                        None => continue,
+                    };
                     if let Some(pixel) =
-                        self.texture[self.ly as usize].get_mut((x + tile_x) as usize)
+                        self.texture[self.ly as usize].get_mut(x as usize)
                     {
-                        // horrible hack, this index can be negative but will underflow
                         if !sprite.behind_bg || pixel.palette_index == 0 {
                             let color = palette[tile[tile_x as usize] as usize];
                             if color.palette_index != 0 {
@@ -408,8 +408,12 @@ impl Ppu {
                 }
             } else {
                 for tile_x in 0..8 {
+                    let x = match (sprite.x + tile_x).checked_sub(8) {
+                        Some(x) => x,
+                        None => continue,
+                    };
                     if let Some(pixel) =
-                        self.texture[self.ly as usize].get_mut((x + tile_x) as usize)
+                        self.texture[self.ly as usize].get_mut(x as usize)
                     {
                         if !sprite.behind_bg || pixel.palette_index == 0 {
                             let color = palette[tile[7 - tile_x as usize] as usize];
