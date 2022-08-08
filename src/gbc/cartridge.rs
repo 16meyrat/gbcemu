@@ -214,6 +214,9 @@ impl Cartridge for MBC1 {
         match addr {
             x if (0xa000..0xc000).contains(&x) => {
                 if self.ram_enable {
+                    if self.ram.is_empty(){
+                        return;
+                    }
                     let index = addr as usize - 0xa000;
                     let ram_bank = self.get_ram_bank();
                     if index < self.ram[ram_bank].len() {
