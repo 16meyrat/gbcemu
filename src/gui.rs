@@ -1,6 +1,5 @@
 use sdl2::GameControllerSubsystem;
 use sdl2::controller::Button;
-use sdl2::event::EventType;
 use sdl2::{event::Event};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
