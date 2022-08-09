@@ -13,7 +13,7 @@ pub struct Ppu {
     wx: u8, // real_WX - 7
     wy: u8,
     ly: u8,
-    lcy: u8,
+    lyc: u8,
     enabled: bool,
     win_enabled: bool,
     sprite_enabled: bool,
@@ -25,7 +25,7 @@ pub struct Ppu {
 
     int_vblank: bool,
     int_hblank: bool,
-    int_lcy: bool,
+    int_lyc: bool,
     int_oam: bool,
 
     current_mode: Mode,
@@ -61,7 +61,7 @@ impl Ppu {
             wx: 0,
             wy: 0,
             ly: 0,
-            lcy: 0,
+            lyc: 0,
             enabled: true,
             win_enabled: false,
             sprite_enabled: false,
@@ -73,7 +73,7 @@ impl Ppu {
 
             int_vblank: false,
             int_hblank: false,
-            int_lcy: false,
+            int_lyc: false,
             int_oam: false,
 
             current_mode: Mode::OamScan,
@@ -166,12 +166,12 @@ impl Ppu {
         panic!("LY is not writable");
     }
 
-    pub fn get_lcy(&self) -> u8 {
-        self.lcy
+    pub fn get_lyc(&self) -> u8 {
+        self.lyc
     }
 
-    pub fn set_lcy(&mut self, val: u8) {
-        self.lcy = val;
+    pub fn set_lyc(&mut self, val: u8) {
+        self.lyc = val;
     }
 
     pub fn get_lcdc(&self) -> u8 {
@@ -234,16 +234,16 @@ impl Ppu {
 
     pub fn get_lcds(&self) -> u8 {
         let mode: u8 = self.current_mode.into();
-        (self.int_lcy as u8) << 6
+        (self.int_lyc as u8) << 6
             | (self.int_oam as u8) << 5
             | (self.int_vblank as u8) << 4
             | (self.int_hblank as u8) << 3
-            | if self.lcy == self.ly { 0x04 } else { 0 }
+            | if self.lyc == self.ly { 0x04 } else { 0 }
             | mode
     }
 
     pub fn set_lcds(&mut self, val: u8) {
-        self.int_lcy = val & 0x40 != 0;
+        self.int_lyc = val & 0x40 != 0;
         self.int_oam = val & 0x20 != 0;
         self.int_vblank = val & 0x10 != 0;
         self.int_hblank = val & 0x08 != 0;
@@ -276,7 +276,7 @@ impl Ppu {
             }
             Mode::HBlank => {
                 self.ly += 1;
-                if self.ly == self.lcy && self.int_lcy {
+                if self.ly == self.lyc && self.int_lyc {
                     res = PpuInterrupt::Stat;
                 }
                 if self.ly >= 144 {

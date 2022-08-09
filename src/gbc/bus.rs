@@ -52,7 +52,7 @@ impl Busable for Bus {
             0xff42 => self.ppu.get_scy(),
             0xff43 => self.ppu.get_scx(),
             0xff44 => self.ppu.get_ly(),
-            0xff45 => self.ppu.get_lcy(),
+            0xff45 => self.ppu.get_lyc(),
             0xff4a => self.ppu.get_wy(),
             0xff4b => self.ppu.get_wx(),
             0xff46 => 0, // dma
@@ -92,7 +92,7 @@ impl Busable for Bus {
             0xff42 => self.ppu.set_scy(value),
             0xff43 => self.ppu.set_scx(value),
             0xff44 => self.ppu.set_ly(value),
-            0xff45 => self.ppu.set_lcy(value),
+            0xff45 => self.ppu.set_lyc(value),
             0xff4a => self.ppu.set_wy(value),
             0xff4b => self.ppu.set_wx(value),
             0xff46 => self.dma(value), // dma
