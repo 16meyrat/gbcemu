@@ -196,7 +196,13 @@ impl Drop for MBC1 {
 impl Cartridge for MBC1 {
     fn read(&self, addr: u16) -> u8 {
         match addr {
-            x if x < 0x4000 => self.banks[0][addr as usize],
+            x if x < 0x4000 => {
+                if !self.alt_bank_select {
+                    self.banks[0][addr as usize]
+                } else {
+                    self.banks[((self.upper_selection << 5) as usize & (self.banks.len() - 1))][addr as usize]
+                }
+            }
             x if x < 0x8000 => self.banks[self.get_rom_bank()][addr as usize - 0x4000],
             x if (0xa000..0xc000).contains(&x) => {
                 if self.ram_enable {
