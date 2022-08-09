@@ -1,4 +1,7 @@
-use sdl2::event::Event;
+use sdl2::GameControllerSubsystem;
+use sdl2::controller::Button;
+use sdl2::event::EventType;
+use sdl2::{event::Event};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use std::time::{Duration, Instant};
@@ -29,6 +32,7 @@ pub enum Message {
 
 pub struct Gui {
     context: sdl2::Sdl,
+    gamepad_subsystem: GameControllerSubsystem,
     canvas: sdl2::render::Canvas<sdl2::video::Window>,
     emu: Emu,
 
@@ -40,7 +44,7 @@ impl Gui {
     pub fn new(emu: Emu) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let video_subsystem = sdl_context.video().unwrap();
-
+        let gamepad_subsystem = sdl_context.game_controller().unwrap();
         let window = video_subsystem
             .window("yaGBemu", WIDTH as u32 * 4, HEIGHT as u32 * 4)
             .position_centered()
@@ -52,8 +56,11 @@ impl Gui {
         canvas.clear();
         canvas.present();
 
+        
+
         Gui {
             context: sdl_context,
+            gamepad_subsystem,
             canvas,
             emu,
 
@@ -63,6 +70,8 @@ impl Gui {
     }
     pub fn run(&mut self) {
         let mut event_pump = self.context.event_pump().unwrap();
+
+        let mut gamepads = vec![];
 
         let texture_creator = self.canvas.texture_creator();
         let mut texture = texture_creator
@@ -177,7 +186,34 @@ impl Gui {
                     } => {
                         events.push(Message::KeyUp(GBKey::Down));
                     }
-
+                    Event::ControllerButtonDown { button, .. } => {
+                        events.push(
+                            if let Some(gb_key) = controller_to_gb_key(&button) {
+                                Message::KeyDown(gb_key)
+                            } else {
+                                continue;
+                            }
+                        )
+                    }
+                    Event::ControllerButtonUp { button, .. } => {
+                        events.push(
+                            if let Some(gb_key) = controller_to_gb_key(&button) {
+                                Message::KeyUp(gb_key)
+                            } else {
+                                continue;
+                            }
+                        )
+                    }
+                    Event::ControllerDeviceAdded { which,.. } => {
+                        println!("Added gamepad {}", self.gamepad_subsystem.name_for_index(which).unwrap());
+                        gamepads.push(self.gamepad_subsystem.open(which).unwrap());
+                    }
+                    Event::ControllerDeviceRemoved { which,.. } => {
+                        if let Some(g) = gamepads.iter().find(|g|g.instance_id() == which) {
+                            println!("Disconnected gamepad {}", g.name());
+                            gamepads.retain(|c|c.instance_id() != which);
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -204,5 +240,19 @@ impl Gui {
                 std::thread::yield_now();
             }
         }
+    }
+}
+
+fn controller_to_gb_key(sdl_key: &Button) -> Option<GBKey> {
+    match sdl_key {
+        Button::A => Some(GBKey::A),
+        Button::B => Some(GBKey::B),
+        Button::Back => Some(GBKey::Select),
+        Button::Start => Some(GBKey::Start),
+        Button::DPadUp => Some(GBKey::Up),
+        Button::DPadDown => Some(GBKey::Down),
+        Button::DPadLeft => Some(GBKey::Left),
+        Button::DPadRight => Some(GBKey::Right),
+        _ => None
     }
 }
