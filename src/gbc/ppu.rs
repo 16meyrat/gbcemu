@@ -299,7 +299,7 @@ impl Ppu {
                     self.ly = 0;
                     self.wait = 80;
                     self.current_mode = Mode::OamScan;
-                    if self.int_oam {
+                    if self.int_oam || self.ly == self.lyc{
                         res = PpuInterrupt::Stat;
                     }
                 }
