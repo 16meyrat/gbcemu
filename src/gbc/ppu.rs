@@ -48,13 +48,13 @@ impl Ppu {
     pub fn new() -> Self {
         Ppu {
             background_palette: (0..4)
-                .map(|idx| bw_palette(idx as u8, idx))
+                .map(|idx| bw_palette(idx as u8, idx, PaletteType::Background))
                 .collect::<ArrayVec<Color, 4>>(),
             obj_palette0: (0..4)
-                .map(|idx| bw_palette(idx as u8, idx))
+                .map(|idx| bw_palette(idx as u8, idx, PaletteType::Sprite))
                 .collect::<ArrayVec<Color, 4>>(),
             obj_palette1: (0..4)
-                .map(|idx| bw_palette(idx as u8, idx))
+                .map(|idx| bw_palette(idx as u8, idx, PaletteType::Sprite))
                 .collect::<ArrayVec<Color, 4>>(),
             scx: 0,
             scy: 0,
@@ -83,7 +83,7 @@ impl Ppu {
 
             wait: 0,
 
-            texture: vec![[Color::new(0, 0, 0); gui::WIDTH]; gui::HEIGHT],
+            texture: vec![[Color::new(0, 0, 0, PaletteType::Background); gui::WIDTH]; gui::HEIGHT],
         }
     }
 
@@ -96,7 +96,11 @@ impl Ppu {
 
     pub fn set_bgp(&mut self, new_palette: u8) {
         for (i, col) in self.background_palette.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << (2 * i))) >> (2 * i), i as u8);
+            *col = bw_palette(
+                (new_palette & (0x3 << (2 * i))) >> (2 * i),
+                i as u8,
+                PaletteType::Background,
+            );
         }
     }
 
@@ -109,7 +113,11 @@ impl Ppu {
 
     pub fn set_obp0(&mut self, new_palette: u8) {
         for (i, col) in self.obj_palette0.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << (2 * i))) >> (2 * i), i as u8);
+            *col = bw_palette(
+                (new_palette & (0x3 << (2 * i))) >> (2 * i),
+                i as u8,
+                PaletteType::Sprite,
+            );
         }
     }
 
@@ -122,7 +130,11 @@ impl Ppu {
 
     pub fn set_obp1(&mut self, new_palette: u8) {
         for (i, col) in self.obj_palette1.iter_mut().enumerate() {
-            *col = bw_palette((new_palette & (0x3 << (2 * i))) >> (2 * i), i as u8);
+            *col = bw_palette(
+                (new_palette & (0x3 << (2 * i))) >> (2 * i),
+                i as u8,
+                PaletteType::Sprite,
+            );
         }
     }
 
@@ -299,7 +311,7 @@ impl Ppu {
                     self.ly = 0;
                     self.wait = 80;
                     self.current_mode = Mode::OamScan;
-                    if self.int_oam || self.ly == self.lyc{
+                    if self.int_oam || self.ly == self.lyc {
                         res = PpuInterrupt::Stat;
                     }
                 }
@@ -381,8 +393,8 @@ impl Ppu {
     fn render_sprites(&mut self) {
         let mut oam_data = self.get_sprites_on_line();
 
-        oam_data.sort_by_key(|sprite| sprite.x);
-        for sprite in oam_data.iter().take(10).rev() {
+        oam_data.sort_by_key(|sprite| sprite.x as i16);
+        for sprite in oam_data.iter() {
             let tile = self.get_sprite_tile_line(sprite);
             let palette = if sprite.palette {
                 self.obj_palette1.clone()
@@ -395,13 +407,15 @@ impl Ppu {
                         Some(x) => x,
                         None => continue,
                     };
-                    if let Some(pixel) =
-                        self.texture[self.ly as usize].get_mut(x as usize)
-                    {
-                        if !sprite.behind_bg || pixel.palette_index == 0 {
-                            let color = palette[tile[tile_x as usize] as usize];
-                            if color.palette_index != 0 {
-                                *pixel = color;
+                    if let Some(pixel) = self.texture[self.ly as usize].get_mut(x as usize) {
+                        if matches!(pixel.palette_type, PaletteType::Background) {
+                            if !sprite.behind_bg || pixel.palette_index == 0 {
+                                let color = palette[tile[tile_x as usize] as usize];
+                                if color.palette_index != 0 {
+                                    *pixel = color;
+                                }
+                            } else {
+                                pixel.palette_type = PaletteType::Sprite; // don't change color, but then low-prio sprite can't be over this pixel
                             }
                         }
                     } // do not break, because of the left screen border
@@ -412,13 +426,15 @@ impl Ppu {
                         Some(x) => x,
                         None => continue,
                     };
-                    if let Some(pixel) =
-                        self.texture[self.ly as usize].get_mut(x as usize)
-                    {
-                        if !sprite.behind_bg || pixel.palette_index == 0 {
-                            let color = palette[tile[7 - tile_x as usize] as usize];
-                            if color.palette_index != 0 {
-                                *pixel = color;
+                    if let Some(pixel) = self.texture[self.ly as usize].get_mut(x as usize) {
+                        if matches!(pixel.palette_type, PaletteType::Background) {
+                            if !sprite.behind_bg || pixel.palette_index == 0 {
+                                let color = palette[tile[7 - tile_x as usize] as usize];
+                                if color.palette_index != 0 {
+                                    *pixel = color;
+                                }
+                            } else {
+                                pixel.palette_type = PaletteType::Sprite; // don't change color, but then low-prio sprite can't be over this pixel
                             }
                         }
                     } // do not break, because of the left screen border
@@ -443,7 +459,7 @@ impl Ppu {
                     y: data[0],
                     x: data[1],
                     tile: data[2],
-                    behind_bg: flags & 80 != 0,
+                    behind_bg: flags & 0x80 != 0,
                     y_flip: flags & 0x40 != 0,
                     x_flip: flags & 0x20 != 0,
                     palette: flags & 0x10 != 0,
@@ -592,38 +608,47 @@ struct SpriteOam {
 }
 
 #[derive(Clone, Copy)]
+enum PaletteType {
+    Background,
+    Sprite,
+}
+
+#[derive(Clone, Copy)]
 struct Color {
     r: u8,
     g: u8,
     b: u8,
     palette_index: u8,
+    palette_type: PaletteType,
 }
 
 impl Color {
-    fn new(r: u8, g: u8, b: u8) -> Self {
+    fn new(r: u8, g: u8, b: u8, palette_type: PaletteType) -> Self {
         Color {
             r,
             g,
             b,
             palette_index: 0,
+            palette_type,
         }
     }
-    fn from_palette(r: u8, g: u8, b: u8, index: u8) -> Self {
+    fn from_palette(r: u8, g: u8, b: u8, index: u8, palette_type: PaletteType) -> Self {
         Color {
             r,
             g,
             b,
             palette_index: index,
+            palette_type,
         }
     }
 }
 
-fn bw_palette(entry: u8, index: u8) -> Color {
+fn bw_palette(entry: u8, index: u8, ptype: PaletteType) -> Color {
     match entry {
-        3 => Color::from_palette(0, 0, 0, index),
-        2 => Color::from_palette(50, 50, 50, index),
-        1 => Color::from_palette(100, 100, 100, index),
-        0 => Color::from_palette(150, 150, 150, index),
+        3 => Color::from_palette(0, 0, 0, index, ptype),
+        2 => Color::from_palette(50, 50, 50, index, ptype),
+        1 => Color::from_palette(100, 100, 100, index, ptype),
+        0 => Color::from_palette(150, 150, 150, index, ptype),
         x => panic!("Unknown BW color : {}", x),
     }
 }
