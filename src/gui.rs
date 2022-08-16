@@ -1,9 +1,11 @@
 use sdl2::GameControllerSubsystem;
 use sdl2::controller::Button;
-use sdl2::{event::Event};
+use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use std::time::{Duration, Instant};
+use std::env;
+use anyhow::Result;
 
 use crate::gbc::Emu;
 
@@ -40,24 +42,25 @@ pub struct Gui {
 }
 
 impl Gui {
-    pub fn new(emu: Emu) -> Self {
-        let sdl_context = sdl2::init().unwrap();
-        let video_subsystem = sdl_context.video().unwrap();
-        let gamepad_subsystem = sdl_context.game_controller().unwrap();
+    pub fn new(emu: Emu) -> Result<Self> {
+        let sdl_context = sdl2::init().map_err(|e|anyhow::anyhow!(e))?;
+        let video_subsystem = sdl_context.video().map_err(|e|anyhow::anyhow!(e))?;
+        let gamepad_subsystem = sdl_context.game_controller().map_err(|e|anyhow::anyhow!(e))?;
+        if let Ok(p) = env::var("SDL_JOYSTICK_MAPPINGS") {
+            gamepad_subsystem.load_mappings(&p)?;
+            println!("Loaded mapping from {p}");
+        }
         let window = video_subsystem
             .window("yaGBemu", WIDTH as u32 * 4, HEIGHT as u32 * 4)
             .position_centered()
-            .build()
-            .unwrap();
+            .build()?;
 
-        let mut canvas = window.into_canvas().build().unwrap();
+        let mut canvas = window.into_canvas().build()?;
 
         canvas.clear();
         canvas.present();
 
-        
-
-        Gui {
+        Ok(Gui {
             context: sdl_context,
             gamepad_subsystem,
             canvas,
@@ -65,12 +68,18 @@ impl Gui {
 
             last_time: Instant::now(),
             last_sleep: Duration::from_millis(0),
-        }
+        })
     }
     pub fn run(&mut self) {
         let mut event_pump = self.context.event_pump().unwrap();
 
         let mut gamepads = vec![];
+        for which in 0..self.gamepad_subsystem.num_joysticks().unwrap() {
+            if self.gamepad_subsystem.is_game_controller(which) {
+                println!("Added gamepad {}", self.gamepad_subsystem.name_for_index(which).unwrap());
+                gamepads.push(self.gamepad_subsystem.open(which).unwrap());
+            }
+        }
 
         let texture_creator = self.canvas.texture_creator();
         let mut texture = texture_creator

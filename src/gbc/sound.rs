@@ -3,7 +3,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use anyhow::{Context, Result};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    BufferSize, Sample, SampleRate, Stream, StreamConfig, SupportedBufferSize,
+    BufferSize, Sample, Stream, StreamConfig, SupportedBufferSize,
 };
 
 use super::bus::Busable;

@@ -19,7 +19,7 @@ fn main() -> Result<()>{
 
     let rom_name = env::args().nth(1).unwrap();
     let emu = Emu::new(&rom_name)?;
-    let mut gui = Gui::new(emu);
+    let mut gui = Gui::new(emu)?;
     gui.run();
     Ok(())
 }
