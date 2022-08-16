@@ -37,7 +37,8 @@ impl Sound {
         let supported_config = supported_configs_range
             .find(|c| c.channels() == 2 && matches!(c.sample_format(), SampleFormat::F32))
             .context("no suitable config")?
-            .with_sample_rate(SampleRate(51200));
+            .with_max_sample_rate()
+            ;
 
         #[cfg(feature = "audio-log")]
         println!("Supported audio config: {supported_config:?}");
@@ -332,11 +333,15 @@ struct Synth {
     sound_length_1: u8,
     current_vol_1: u8,
     envelope_timer_1: u8,
+    cycle_index_1: u8,
+    square_timer_1: Timer,
 
     hz_frequency_2: u32,
     sound_length_2: u8,
     current_vol_2: u8,
     envelope_timer_2: u8,
+    cycle_index_2: u8,
+    square_timer_2: Timer,
 
     hz_frequency_3: u32,
     sound_length_3: u16,
@@ -363,14 +368,20 @@ impl Synth {
             timer_512: 0,
             envelope_master_timer: 0,
             length_timer: 0,
+
             hz_frequency_1: 0,
             sound_length_1: 0,
             envelope_timer_1: 0,
             current_vol_1: 0,
+            cycle_index_1: 0,
+            square_timer_1: Timer::new(0, sample_rate),
+
             hz_frequency_2: 0,
             sound_length_2: 0,
             envelope_timer_2: 0,
             current_vol_2: 0,
+            cycle_index_2: 0,
+            square_timer_2: Timer::new(0, sample_rate),
 
             hz_frequency_3: 0,
             sound_length_3: 0,
@@ -399,6 +410,8 @@ impl Synth {
                     (131072. / (2048. - (state.frequency_1 as f32)).round()) as u32;
                 self.current_vol_1 = state.envelope_vol_1;
                 self.envelope_timer_1 = state.envelope_sweep_1;
+                self.cycle_index_1 = 0;
+                self.square_timer_1 = Timer::new(self.hz_frequency_1 * 8, self.sample_rate);
             }
             trigger_2 |= state.trigger_2;
 
@@ -407,6 +420,8 @@ impl Synth {
                     (131072. / (2048. - (state.frequency_2 as f32)).round()) as u32;
                 self.current_vol_2 = state.envelope_vol_2;
                 self.envelope_timer_2 = state.envelope_sweep_2;
+                self.cycle_index_2 = 0;
+                self.square_timer_2 = Timer::new(self.hz_frequency_2 * 8, self.sample_rate);
             }
             trigger_3 |= state.wave.trigger;
             if state.wave.trigger {
@@ -521,10 +536,11 @@ impl Synth {
                 self.envelope_timer_1 -= 1;
             }
         }
-        let freq = self.hz_frequency_1 as u64;
-        let normalized = (self.n * freq) % (self.sample_rate as u64);
-        let cycle_index = (8. * (normalized as f32) / (self.sample_rate as f32)) as usize;
-        SQUARE_PATTERN[self.reg_state.wave_pattern_1 as usize][cycle_index]
+        self.square_timer_1.sample_tick();
+        if self.square_timer_1.is_triggered() {
+            self.cycle_index_1 = (self.cycle_index_1 + 1) % 8; 
+        }
+        SQUARE_PATTERN[self.reg_state.wave_pattern_1 as usize][self.cycle_index_1 as usize]
             * self.current_vol_1 as f32
             / 15.
     }
@@ -552,10 +568,11 @@ impl Synth {
                 self.envelope_timer_2 -= 1;
             }
         }
-        let freq = self.hz_frequency_2 as u64;
-        let normalized = (self.n * freq) % (self.sample_rate as u64);
-        let cycle_index = (8. * (normalized as f32) / (self.sample_rate as f32)) as usize;
-        SQUARE_PATTERN[self.reg_state.wave_pattern_2 as usize][cycle_index]
+        self.square_timer_2.sample_tick();
+        if self.square_timer_2.is_triggered() {
+            self.cycle_index_2 = (self.cycle_index_2 + 1) % 8; 
+        }
+        SQUARE_PATTERN[self.reg_state.wave_pattern_2 as usize][self.cycle_index_2 as usize]
             * self.current_vol_2 as f32
             / 15.
     }
