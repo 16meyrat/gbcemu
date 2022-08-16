@@ -623,7 +623,7 @@ impl Synth {
                 self.lfsr |= xor_result << 6;
             }
         }
-        (!self.lfsr & 1) as f32 * self.current_vol_4 as f32 / 7.5 - 0.5
+        (!self.lfsr & 1) as f32 * self.current_vol_4 as f32 / 15. - 0.5
     }
 }
 
