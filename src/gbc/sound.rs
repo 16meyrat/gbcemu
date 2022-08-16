@@ -86,7 +86,7 @@ impl Busable for Sound {
                 #[cfg(feature = "audio-log")]
                 eprintln!("Sound read at {addr:#x}");
                 0
-            }, // TODO: panic
+            } // TODO: panic
         }
     }
 
@@ -162,6 +162,25 @@ impl Busable for Sound {
                 self.state.wave.trigger = value & 0x80 != 0;
                 self.state.wave.length_en = value & 0x40 != 0;
             }
+            0xff20 => {
+                self.state.noise.length = 64 - (value & 0x3f);
+            }
+            0xff21 => {
+                self.state.noise.envelope_vol = value >> 4;
+                self.state.noise.envelope_increase = value & 0x08 != 0;
+                self.state.noise.envelope_sweep = value & 0x07;
+            }
+            0xff22 => {
+                let div_code = (value & 0x7) as u16;
+                let shift_clock_frequency = (value >> 4) as u16;
+                self.state.noise.short_pattern = value & 0x08 != 0;
+                self.state.noise.frequency =
+                    if div_code > 0 { div_code << 4 } else { 8 } << shift_clock_frequency;
+            }
+            0xff23 => {
+                self.state.noise.trigger = value & 0x80 != 0;
+                self.state.noise.length_en = value & 0x40 != 0;
+            }
             0xff24 => {
                 self.state.left_vol = (value & 0x70) >> 4;
                 self.state.right_vol = value & 0x07;
@@ -177,7 +196,7 @@ impl Busable for Sound {
                 self.state.wave.pattern[index * 2] = value >> 4;
                 self.state.wave.pattern[index * 2 + 1] = value & 0x0f;
             }
-            _ => {} // TODO: panic
+            _ => {eprintln!("Invalid sound write at {addr:#x}")} 
         }
         self.tx
             .send(self.state.clone())
@@ -185,6 +204,7 @@ impl Busable for Sound {
         self.state.trigger_1 = false;
         self.state.trigger_2 = false;
         self.state.wave.trigger = false;
+        self.state.noise.trigger = false;
     }
 }
 
@@ -225,6 +245,7 @@ struct SynthRegState {
     right_vol: u8,
 
     wave: SynthWave,
+    noise: SynthNoise,
 }
 
 #[derive(Default, Clone)]
@@ -236,6 +257,33 @@ struct SynthWave {
     length_en: bool,
     trigger: bool,
     pattern: [u8; 32],
+}
+
+#[derive(Clone)]
+struct SynthNoise {
+    length: u8,
+    envelope_vol: u8,
+    envelope_increase: bool,
+    envelope_sweep: u8,
+    frequency: u16,
+    short_pattern: bool,
+    length_en: bool,
+    trigger: bool,
+}
+
+impl Default for SynthNoise {
+    fn default() -> Self {
+        Self {
+            length: Default::default(),
+            envelope_vol: Default::default(),
+            envelope_increase: Default::default(),
+            envelope_sweep: Default::default(),
+            frequency: 8,
+            short_pattern: Default::default(),
+            length_en: Default::default(),
+            trigger: Default::default(),
+        }
+    }
 }
 
 const SQUARE_PATTERN: [[f32; 8]; 4] = [
@@ -294,6 +342,13 @@ struct Synth {
     sound_length_3: u16,
     wave_timer: Timer,
     pattern_index_3: u32,
+
+    hz_frequency_4: u32,
+    sound_length_4: u16,
+    current_vol_4: u8,
+    envelope_timer_4: u8,
+    lfsr: u16,
+    noise_timer: Timer,
 }
 
 impl Synth {
@@ -321,6 +376,13 @@ impl Synth {
             sound_length_3: 0,
             wave_timer: Timer::new(0, sample_rate),
             pattern_index_3: 0,
+
+            hz_frequency_4: 0,
+            sound_length_4: 0,
+            noise_timer: Timer::new(0, sample_rate),
+            current_vol_4: 0,
+            lfsr: 0,
+            envelope_timer_4: 0,
         }
     }
 
@@ -329,6 +391,7 @@ impl Synth {
         let mut trigger_1 = false;
         let mut trigger_2 = false;
         let mut trigger_3 = false;
+        let mut trigger_4 = false;
         while let Ok(state) = self.rx.try_recv() {
             trigger_1 |= state.trigger_1;
             if state.trigger_1 {
@@ -348,15 +411,24 @@ impl Synth {
             trigger_3 |= state.wave.trigger;
             if state.wave.trigger {
                 self.hz_frequency_3 =
-                    32 * (65536./ (2048. - (state.wave.frequency as f32)).round()) as u32;
+                    32 * (65536. / (2048. - (state.wave.frequency as f32)).round()) as u32;
                 self.wave_timer = Timer::new(self.hz_frequency_3, self.sample_rate);
                 self.pattern_index_3 = 2;
+            }
+            trigger_4 |= state.noise.trigger;
+            if state.noise.trigger {
+                self.hz_frequency_4 = (524288u32 << 3) / (state.noise.frequency as u32);
+                self.noise_timer = Timer::new(self.hz_frequency_4, self.sample_rate);
+                self.current_vol_4 = state.noise.envelope_vol;
+                self.envelope_timer_4 = state.noise.envelope_sweep;
+                self.lfsr = 0xffff;
             }
             new_state = state;
         }
         new_state.trigger_1 = trigger_1;
         new_state.trigger_2 = trigger_2;
         new_state.wave.trigger = trigger_3;
+        new_state.noise.trigger = trigger_4;
         self.reg_state = new_state;
     }
 
@@ -389,6 +461,7 @@ impl Synth {
         let square1 = self.next_square_1();
         let square2 = self.next_square_2();
         let wave = self.next_wave();
+        let noise = self.next_noise();
         self.n += 1;
         if self.n > u64::MAX / 2 && self.n % (self.sample_rate as u64) == 0 {
             self.n = 0; // TODO: better with lcm ?
@@ -404,6 +477,9 @@ impl Synth {
         if self.reg_state.channel_pan & 0x40 != 0 {
             left += wave;
         }
+        if self.reg_state.channel_pan & 0x80 != 0 {
+            left += noise;
+        }
         if self.reg_state.channel_pan & 0x01 != 0 {
             right += square1;
         }
@@ -412,6 +488,9 @@ impl Synth {
         }
         if self.reg_state.channel_pan & 0x04 != 0 {
             right += wave;
+        }
+        if self.reg_state.channel_pan & 0x08 != 0 {
+            right += noise;
         }
         (
             left * 0.4 * self.reg_state.left_vol as f32 / 8.,
@@ -504,7 +583,47 @@ impl Synth {
         }
         ((self.reg_state.wave.pattern[self.pattern_index_3 as usize]
             >> self.reg_state.wave.volume_shift) as f32)
-            / 7.5 - 0.5
+            / 7.5
+            - 0.5
+    }
+
+    fn next_noise(&mut self) -> f32 {
+        if self.reg_state.noise.length_en && self.sound_length_4 != 0 && self.length_timer == 0 {
+            self.sound_length_4 -= 1;
+        }
+        if self.reg_state.noise.trigger {
+            self.sound_length_4 = self.reg_state.noise.length as u16;
+            self.reg_state.noise.trigger = false;
+            self.lfsr = 0xffff;
+        }
+        if self.sound_length_4 == 0 {
+            return 0.;
+        }
+        if self.reg_state.noise.envelope_sweep != 0 && self.envelope_master_timer == 0 {
+            if self.envelope_timer_4 == 0 {
+                self.envelope_timer_4 = self.reg_state.noise.envelope_sweep;
+                if self.reg_state.noise.envelope_increase && self.current_vol_4 != 0xf {
+                    self.current_vol_4 += 1;
+                } else if !self.reg_state.noise.envelope_increase && self.current_vol_4 != 0x0 {
+                    self.current_vol_4 -= 1;
+                }
+            } else {
+                self.envelope_timer_4 -= 1;
+            }
+        }
+        self.noise_timer.sample_tick();
+        if self.noise_timer.is_triggered() {
+            self.noise_timer = Timer::new(self.hz_frequency_4, self.sample_rate);
+
+            let xor_result = (self.lfsr & 0b01) ^ ((self.lfsr & 0b10) >> 1);
+            self.lfsr = (self.lfsr >> 1) | (xor_result << 14);
+
+            if self.reg_state.noise.short_pattern {
+                self.lfsr &= !(1 << 6);
+                self.lfsr |= xor_result << 6;
+            }
+        }
+        (!self.lfsr & 1) as f32 * self.current_vol_4 as f32 / 7.5 - 0.5
     }
 }
 
