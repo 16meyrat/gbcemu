@@ -43,6 +43,7 @@ pub struct Gui {
 
 impl Gui {
     pub fn new(emu: Emu) -> Result<Self> {
+        sdl2::hint::set("SDL_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR", "0");
         let sdl_context = sdl2::init().map_err(|e|anyhow::anyhow!(e))?;
         let video_subsystem = sdl_context.video().map_err(|e|anyhow::anyhow!(e))?;
         let gamepad_subsystem = sdl_context.game_controller().map_err(|e|anyhow::anyhow!(e))?;
