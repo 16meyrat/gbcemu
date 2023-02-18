@@ -84,6 +84,9 @@ impl Busable for Sound {
                     | (self.state.envelope_increase_1 as u8) << 3
                     | self.state.envelope_sweep_1 & 0x7
             }
+            0xff25 => {
+                self.state.channel_pan
+            }
             _ => {
                 #[cfg(feature = "audio-log")]
                 eprintln!("Sound read at {addr:#x}");
@@ -317,7 +320,7 @@ fn audio_thread<T: Sample + FromSample<f32>>(data: &mut [T], synth: &mut Synth) 
     for channels in data.chunks_mut(2) {
         let sample = synth.next_sample();
         channels[0] = Sample::from_sample::<f32>(sample.0);
-        channels[1] = Sample::from_sample::<f32>(sample.0);
+        channels[1] = Sample::from_sample::<f32>(sample.1);
     }
 }
 
@@ -510,8 +513,8 @@ impl Synth {
             right += noise;
         }
         (
-            left * 0.4 * self.reg_state.left_vol as f32 / 8.,
-            right * 0.4 * self.reg_state.right_vol as f32 / 8.,
+            left * 0.4 * (1.+self.reg_state.left_vol as f32) / 9.,
+            right * 0.4 * (1.+self.reg_state.right_vol as f32) / 9.,
         )
     }
 
