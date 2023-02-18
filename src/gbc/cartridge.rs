@@ -13,12 +13,12 @@ pub trait Cartridge {
 
 pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
     let mut rom = Rom::new(path)?;
-    println!("Loading {} ...", path);
+    println!("Loading {path} ...");
     let title = rom.get_title()?;
-    println!("Title: {}", title);
+    println!("Title: {title}");
 
     let gbc = rom.is_gbc();
-    println!("Game Boy Color mode: {}", gbc);
+    println!("Game Boy Color mode: {gbc}");
 
     println!("External RAM size : {}KiB", rom.get_ram_size()? / 0x400);
 
@@ -38,7 +38,7 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
             )?)
         }
         _ => {
-            panic!("Unsuported MBC : {:?}", mbc_type);
+            bail!("Unsuported MBC : {mbc_type:?}");
         }
     };
     println!("Rom loaded !");
