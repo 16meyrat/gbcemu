@@ -354,9 +354,9 @@ impl Cartridge for MBC2 {
                 self.banks[0][addr as usize]
             }
             x if x < 0x8000 => self.banks[self.bank_selection as usize][addr as usize - 0x4000],
-            x if (0xa000..0xc000).contains(&x) => {
-                if self.ram_enable && !self.ram.is_empty(){
-                    *self.ram.get(addr as usize - 0xa000).unwrap_or(&0)
+            x if (0xa000..0xa200).contains(&x) => {
+                if self.ram_enable {
+                    self.ram[(addr - 0xa000) as usize]
                 } else {
                     0
                 }
@@ -366,25 +366,20 @@ impl Cartridge for MBC2 {
     }
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
-            x if (0xa000..0xc000).contains(&x) => {
+            x if (0xa000..0xa200).contains(&x) => {
                 if self.ram_enable {
-                    if self.ram.is_empty() {
-                        return;
-                    }
                     let index = addr as usize - 0xa000;
                     if index < self.ram.len() {
                         self.ram[index] = val;
                     }
                 }
             }
-            x if x < 0x2000 => {
-                if x & 0x100 == 0 {
-                    self.ram_enable = val & 0xf == 0xa;
-                }
-            }
             x if x < 0x4000 => {
                 if x & 0x100 != 0 {
-                    self.bank_selection = val & 0xf;
+                    let masked = val & 0xf;
+                    self.bank_selection = if masked > 0 {masked} else {1};
+                } else {
+                    self.ram_enable = val & 0x0f == 0x0a;
                 }
             }
             _ => {
