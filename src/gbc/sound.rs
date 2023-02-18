@@ -1,9 +1,9 @@
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    BufferSize, Sample, Stream, StreamConfig, SupportedBufferSize,
+    BufferSize, Sample, Stream, StreamConfig, SupportedBufferSize, SizedSample, FromSample,
 };
 
 use super::bus::Busable;
@@ -63,6 +63,7 @@ impl Sound {
             SampleFormat::F32 => start_audio_stream::<f32>(&device, &config, synth),
             SampleFormat::I16 => start_audio_stream::<i16>(&device, &config, synth),
             SampleFormat::U16 => start_audio_stream::<u16>(&device, &config, synth),
+            other => bail!("Unsupported sample format {other}")
         }
         .context("Failed to build output audio stream")?;
         stream.play().context("Failed to play stream")?;
@@ -294,28 +295,29 @@ const SQUARE_PATTERN: [[f32; 8]; 4] = [
     [1., 1., 1., 1., 1., 1., -1., -1.],
 ];
 
-fn start_audio_stream<T: Sample>(
+fn start_audio_stream<T: Sample + SizedSample + FromSample<f32>>(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
     mut synth: Synth,
 ) -> Result<Stream> {
-    let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
+    let err_fn = |err| eprintln!("an error occurred on the output audio stream: {err}");
     let stream = device
         .build_output_stream(
             config,
             move |data: &mut [T], _: &cpal::OutputCallbackInfo| audio_thread(data, &mut synth),
             err_fn,
+            None,
         )
         .context("Failed start audio thread")?;
     Ok(stream)
 }
 
-fn audio_thread<T: Sample>(data: &mut [T], synth: &mut Synth) {
+fn audio_thread<T: Sample + FromSample<f32>>(data: &mut [T], synth: &mut Synth) {
     synth.update_cmd();
     for channels in data.chunks_mut(2) {
         let sample = synth.next_sample();
-        channels[0] = Sample::from::<f32>(&sample.0);
-        channels[1] = Sample::from::<f32>(&sample.1);
+        channels[0] = Sample::from_sample::<f32>(sample.0);
+        channels[1] = Sample::from_sample::<f32>(sample.0);
     }
 }
 
@@ -364,7 +366,7 @@ impl Synth {
             reg_state: Default::default(),
             n: 0,
             sample_rate,
-            timer_512_reset: (sample_rate / 512) as u32,
+            timer_512_reset: sample_rate / 512,
             timer_512: 0,
             envelope_master_timer: 0,
             length_timer: 0,
