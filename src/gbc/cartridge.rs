@@ -37,6 +37,21 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
                 matches!(mbc_type, MbcType::Mbc1RamBattery),
             )?)
         }
+        MbcType::Mbc2 | MbcType::Mbc2Battery => {
+            println!("Mapper is MBC2");
+            Box::new(MBC2::new(
+                &mut rom,
+                matches!(mbc_type, MbcType::Mbc2Battery),
+            )?)
+        }
+        MbcType::Mbc3 | MbcType::Mbc3Ram | MbcType::Mbc3RamBattery => {
+            bail!("Unimplemented MBC3")
+            // println!("Mapper is MBC3");
+            // Box::new(MBC1::new(
+            //     &mut rom,
+            //     matches!(mbc_type, MbcType::Mbc3RamBattery),
+            // )?)
+        }
         _ => {
             bail!("Unsuported MBC : {mbc_type:?}");
         }
@@ -206,7 +221,7 @@ impl Cartridge for MBC1 {
             }
             x if x < 0x8000 => self.banks[self.get_rom_bank()][addr as usize - 0x4000],
             x if (0xa000..0xc000).contains(&x) => {
-                if self.ram_enable {
+                if self.ram_enable && !self.ram.is_empty(){
                     *self.ram[self.get_ram_bank()]
                         .get(addr as usize - 0xa000)
                         .unwrap_or(&0)
@@ -250,6 +265,135 @@ impl Cartridge for MBC1 {
         };
     }
 }
+
+struct MBC2 {
+    banks: Vec<[u8; 0x4000]>,
+    ram: [u8; 0x200],
+    ram_file: Option<File>,
+    ram_enable: bool,
+    bank_selection: u8,
+}
+
+impl MBC2 {
+    pub fn new(rom: &mut Rom, battery: bool) -> Result<Self> {
+        let bank_nb = rom.get_rom_size()? / 16;
+        if bank_nb > 16 {
+            bail!("Invalid bank count fo mbc1: {bank_nb}");
+        }
+        let ram_size = rom.get_ram_size()?;
+        if ram_size != 0 {
+            bail!("Invalid ram size for MBC2: {:x}", ram_size);
+        }
+        let rom_data = rom.read_range(0, rom.get_data_len())?;
+        let mut save_path = rom.path.clone();
+        save_path.set_extension("save");
+        let mut ram_file = if battery {
+            Some(
+                OpenOptions::new()
+                    .write(true)
+                    .read(true)
+                    .create(true)
+                    .open(&save_path)?,
+            )
+        } else {
+            None
+        };
+        let mut ram = [0u8; 0x200];
+        if let Some(ram_file) = &mut ram_file {
+            let file_len = ram_file.seek(SeekFrom::End(0))?;
+            ram_file.rewind()?;
+            if file_len != 0 {
+                ram_file.read_exact(&mut ram).with_context(|| {
+                    format!("Save file {} is corrupted", save_path.display())
+                })?;
+                println!("Save file loaded from {}", save_path.display());
+                ram_file.rewind()?;
+            } else {
+                println!("Save file created at {}", save_path.display());
+            }
+        }
+
+        let mut res = MBC2 {
+            banks: vec![[0; 0x4000]; bank_nb],
+            ram,
+            ram_file,
+            ram_enable: false,
+            bank_selection: 1,
+        };
+        let mut i = 0;
+        for chunk in rom_data.chunks(0x4000) {
+            res.banks[i][..chunk.len()].copy_from_slice(chunk);
+            i += 1;
+            if i & 0x1f == 0 {
+                i += 1;
+            }
+        }
+        Ok(res)
+    }
+}
+
+impl Drop for MBC2 {
+    fn drop(&mut self) {
+        if let Err(e) = (|| -> Result<()> {
+            if let Some(ram_file) = &mut self.ram_file {
+                ram_file.rewind()?;
+                ram_file.write_all(&self.ram)?;
+                println!("Game saved!");
+            }
+            Ok(())
+        })() {
+            eprintln!("Game save failed: {e:#}");
+        }
+    }
+}
+
+impl Cartridge for MBC2 {
+    fn read(&self, addr: u16) -> u8 {
+        match addr {
+            x if x < 0x4000 => {
+                self.banks[0][addr as usize]
+            }
+            x if x < 0x8000 => self.banks[self.bank_selection as usize][addr as usize - 0x4000],
+            x if (0xa000..0xc000).contains(&x) => {
+                if self.ram_enable && !self.ram.is_empty(){
+                    *self.ram.get(addr as usize - 0xa000).unwrap_or(&0)
+                } else {
+                    0
+                }
+            }
+            _ => panic!("Illegal cartridge read at {addr:#x}"),
+        }
+    }
+    fn write(&mut self, addr: u16, val: u8) {
+        match addr {
+            x if (0xa000..0xc000).contains(&x) => {
+                if self.ram_enable {
+                    if self.ram.is_empty() {
+                        return;
+                    }
+                    let index = addr as usize - 0xa000;
+                    if index < self.ram.len() {
+                        self.ram[index] = val;
+                    }
+                }
+            }
+            x if x < 0x2000 => {
+                if x & 0x100 == 0 {
+                    self.ram_enable = val & 0xf == 0xa;
+                }
+            }
+            x if x < 0x4000 => {
+                if x & 0x100 != 0 {
+                    self.bank_selection = val & 0xf;
+                }
+            }
+            _ => {
+                panic!("Illegal cartridge write at {addr:#x}")
+            }
+        };
+    }
+}
+
 
 #[derive(TryFromPrimitive, Debug)]
 #[repr(u8)]
