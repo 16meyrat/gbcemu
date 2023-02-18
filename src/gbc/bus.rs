@@ -66,7 +66,7 @@ impl Busable for Bus {
             0xff01 => 0, // serial
             0xff02 => 0, // serial
             x if (0xff10..0xff40).contains(&x) => self.sound.read(addr), // sound
-            _ => panic!("Illegal read at {:#x}", addr)
+            _ => panic!("Illegal read at {addr:#x}")
         }
     }
 
@@ -110,7 +110,7 @@ impl Busable for Bus {
             0xff01 => {}, // serial
             0xff02 => {}, // serial
             x if (0xff10..0xff40).contains(&x) => self.sound.write(addr, value), // sound
-            _ => panic!("Illegal write at {:#x}", addr)
+            _ => panic!("Illegal write at {addr:#x}")
         };
     }
 }

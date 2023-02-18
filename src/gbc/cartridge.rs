@@ -57,7 +57,7 @@ impl Cartridge for NRom {
             x if (0xa000..0xc000).contains(&x) => {
                 *self.ram.get(addr as usize - 0xa000).unwrap_or(&0)
             }
-            _ => panic!("Illegal cartridge read at {:#x}", addr),
+            _ => panic!("Illegal cartridge read at {addr:#x}"),
         }
     }
     fn write(&mut self, addr: u16, val: u8) {
@@ -188,7 +188,7 @@ impl Drop for MBC1 {
             }
             Ok(())
         })() {
-            eprintln!("Game save failed: {:#}", e);
+            eprintln!("Game save failed: {e:#}");
         }
     }
 }
@@ -200,7 +200,8 @@ impl Cartridge for MBC1 {
                 if !self.alt_bank_select {
                     self.banks[0][addr as usize]
                 } else {
-                    self.banks[((self.upper_selection << 5) as usize & (self.banks.len() - 1))][addr as usize]
+                    self.banks[((self.upper_selection << 5) as usize & (self.banks.len() - 1))]
+                        [addr as usize]
                 }
             }
             x if x < 0x8000 => self.banks[self.get_rom_bank()][addr as usize - 0x4000],
@@ -213,14 +214,14 @@ impl Cartridge for MBC1 {
                     0
                 }
             }
-            _ => panic!("Illegal cartridge read at {:#x}", addr),
+            _ => panic!("Illegal cartridge read at {addr:#x}"),
         }
     }
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
             x if (0xa000..0xc000).contains(&x) => {
                 if self.ram_enable {
-                    if self.ram.is_empty(){
+                    if self.ram.is_empty() {
                         return;
                     }
                     let index = addr as usize - 0xa000;
@@ -244,7 +245,7 @@ impl Cartridge for MBC1 {
                 self.alt_bank_select = val & 1 == 0;
             }
             _ => {
-                panic!("Illegal cartridge write at {:#x}", addr)
+                panic!("Illegal cartridge write at {addr:#x}")
             }
         };
     }
@@ -269,6 +270,14 @@ enum MbcType {
     Mbc3 = 0x11,
     Mbc3Ram = 0x12,
     Mbc3RamBattery = 0x13,
+    Mbc5 = 0x19,
+    Mbc5Ram = 0x1a,
+    Mbc5RamBattery = 0x1b,
+    Mbc5Rumble = 0x1c,
+    Mbc5RumbleRam = 0x1d,
+    Mbc5RumbleRamBattery = 0x1e,
+    Mbc6 = 0x20,
+    Mbc6All = 0x21,
     Unknown,
 }
 
@@ -331,7 +340,7 @@ impl Rom {
 
     fn get_mbc_type(&mut self) -> Result<MbcType> {
         let mbc_code = self.data[0x147];
-        MbcType::try_from(mbc_code).context(format!("Unsuported MBC: {:x}", mbc_code))
+        MbcType::try_from(mbc_code).context(format!("Unsuported MBC: {mbc_code:x}"))
     }
 
     fn get_data_len(&self) -> usize {
