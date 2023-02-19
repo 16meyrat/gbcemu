@@ -176,11 +176,11 @@ impl Busable for Sound {
                 self.state.noise.envelope_sweep = value & 0x07;
             }
             0xff22 => {
-                let div_code = (value & 0x7) as u16;
+                let div_code = (value & 0x7) as u32;
                 let shift_clock_frequency = (value >> 4) as u16;
                 self.state.noise.short_pattern = value & 0x08 != 0;
                 self.state.noise.frequency =
-                    if div_code > 0 { div_code << 4 } else { 8 } << shift_clock_frequency;
+                    if div_code > 0 { div_code << 4 } else { 1 << 3 } << shift_clock_frequency;
             }
             0xff23 => {
                 self.state.noise.trigger = value & 0x80 != 0;
@@ -270,7 +270,7 @@ struct SynthNoise {
     envelope_vol: u8,
     envelope_increase: bool,
     envelope_sweep: u8,
-    frequency: u16,
+    frequency: u32,
     short_pattern: bool,
     length_en: bool,
     trigger: bool,
@@ -393,7 +393,7 @@ impl Synth {
             wave_timer: Timer::new(0, sample_rate),
             pattern_index_3: 0,
 
-            hz_frequency_4: 0,
+            hz_frequency_4: 1,
             sound_length_4: 0,
             noise_timer: Timer::new(0, sample_rate),
             current_vol_4: 0,
