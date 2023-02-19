@@ -602,7 +602,8 @@ impl Cartridge for MBC3 {
                         self.ram_rtc_selection = val;
                     }
                     _ => {
-                        eprintln!("Invalid RAM RTC selection: {val:#x}");
+                        #[cfg(feature = "disasm")]
+                        eprintln!("Invalid RAM RTC selection: {val:#x} at {addr:#x}");
                     }
                 }
             }
