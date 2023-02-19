@@ -11,6 +11,7 @@ num_enum = "0.5.7"
 sdl2 = "0.35"
 arrayvec = "0.7"
 anyhow = "1"
+time = { version = "0.3" }
 cpal = { version = "0.15" }
 
 [features]
