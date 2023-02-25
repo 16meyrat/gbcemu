@@ -123,6 +123,7 @@ impl Busable for Sound {
                 self.state.length_en_1 = value & 0x40 != 0;
             }
             0xff15 => {
+                #[cfg(feature = "audio-log")]
                 eprintln!("Write to unused sound reguister ff15");
             }
             0xff16 => {
@@ -201,7 +202,7 @@ impl Busable for Sound {
                 self.state.wave.pattern[index * 2] = value >> 4;
                 self.state.wave.pattern[index * 2 + 1] = value & 0x0f;
             }
-            _ => {eprintln!("Invalid sound write at {addr:#x}")} 
+            _ => {#[cfg(feature = "audio-log")]eprintln!("Invalid sound write at {addr:#x}")} 
         }
         self.tx
             .send(self.state.clone())
