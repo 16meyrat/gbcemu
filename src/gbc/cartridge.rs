@@ -45,11 +45,11 @@ pub fn load_rom(path: &str) -> Result<Box<dyn Cartridge>> {
                 matches!(mbc_type, MbcType::Mbc2Battery),
             )?)
         }
-        MbcType::Mbc3 | MbcType::Mbc3Ram | MbcType::Mbc3RamBattery => {
+        MbcType::Mbc3 | MbcType::Mbc3Ram | MbcType::Mbc3TimerBattery| MbcType::Mbc3TimerRamBattery | MbcType::Mbc3RamBattery => {
             println!("Mapper is MBC3");
             Box::new(MBC3::new(
                 &mut rom,
-                matches!(mbc_type, MbcType::Mbc3RamBattery),
+                matches!(mbc_type, MbcType::Mbc3RamBattery | MbcType::Mbc3TimerRamBattery | MbcType::Mbc3TimerBattery),
             )?)
         }
         _ => {
